@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/tracking_service.dart';
 import '../services/wifi_service.dart';
+import '../services/background_service.dart';
 import '../models/office_session.dart';
 
 /// Главный экран приложения
@@ -35,6 +36,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Инициализирует приложение
   Future<void> _initializeApp() async {
+    // Инициализируем фоновый сервис
+    await BackgroundService.initialize();
+    
+    // Запускаем фоновый сервис
+    await BackgroundService.start();
+    
     // Автоматически запускаем отслеживание при старте
     if (!TrackingService.isTracking) {
       await TrackingService.startTracking();
