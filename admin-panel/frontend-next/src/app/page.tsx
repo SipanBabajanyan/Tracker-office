@@ -87,25 +87,27 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b">
+      <div className="bg-white/80 backdrop-blur-md shadow-xl border-b border-white/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
+          <div className="flex justify-between items-center py-8">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">🏢 In Office</h1>
-              <p className="text-gray-600">Отслеживание присутствия сотрудников</p>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                🏢 In Office
+              </h1>
+              <p className="text-gray-600 mt-1">Отслеживание присутствия сотрудников</p>
             </div>
-            <div className="flex space-x-3">
+            <div className="flex space-x-4">
               <button 
                 onClick={loadEmployees}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-3 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 font-medium"
               >
                 🔄 Обновить
               </button>
               <button 
                 onClick={handleLogout}
-                className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center"
+                className="bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-3 rounded-xl hover:from-red-600 hover:to-red-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center font-medium"
               >
                 <LogOut className="h-4 w-4 mr-2" />
                 Выйти
@@ -117,95 +119,107 @@ export default function Dashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Period Selector */}
-        <div className="mb-8">
-          <div className="flex space-x-2">
-            {['today', 'week', 'month', 'year'].map((period) => (
-              <button
-                key={period}
-                onClick={() => setCurrentPeriod(period)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                  currentPeriod === period
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-50 border'
-                }`}
-              >
-                {period === 'today' && 'Сегодня'}
-                {period === 'week' && 'Неделя'}
-                {period === 'month' && 'Месяц'}
-                {period === 'year' && 'Год'}
-              </button>
-            ))}
+        <div className="mb-10">
+          <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-2 shadow-lg border border-white/20">
+            <div className="flex space-x-2">
+              {['today', 'week', 'month', 'year'].map((period) => (
+                <button
+                  key={period}
+                  onClick={() => setCurrentPeriod(period)}
+                  className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                    currentPeriod === period
+                      ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg transform scale-105'
+                      : 'text-gray-700 hover:bg-white/50 hover:shadow-md'
+                  }`}
+                >
+                  {period === 'today' && 'Сегодня'}
+                  {period === 'week' && 'Неделя'}
+                  {period === 'month' && 'Месяц'}
+                  {period === 'year' && 'Год'}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <div className="flex items-center">
-              <Users className="h-8 w-8 text-blue-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Всего сотрудников</p>
-                <p className="text-2xl font-bold text-gray-900">{employees.length}</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-8 rounded-2xl shadow-xl text-white transform hover:scale-105 transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-blue-100 text-sm font-medium mb-2">Всего сотрудников</p>
+                <p className="text-4xl font-bold">{employees.length}</p>
+              </div>
+              <div className="bg-white/20 p-4 rounded-xl">
+                <Users className="h-8 w-8" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <div className="flex items-center">
-              <Clock className="h-8 w-8 text-green-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">В офисе сейчас</p>
-                <p className="text-2xl font-bold text-gray-900">{inOfficeCount}</p>
+          <div className="bg-gradient-to-br from-green-500 to-green-600 p-8 rounded-2xl shadow-xl text-white transform hover:scale-105 transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-green-100 text-sm font-medium mb-2">В офисе сейчас</p>
+                <p className="text-4xl font-bold">{inOfficeCount}</p>
+              </div>
+              <div className="bg-white/20 p-4 rounded-xl">
+                <Clock className="h-8 w-8" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <div className="flex items-center">
-              <TrendingUp className="h-8 w-8 text-purple-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Среднее время (ч)</p>
-                <p className="text-2xl font-bold text-gray-900">{avgTime}</p>
+          <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-8 rounded-2xl shadow-xl text-white transform hover:scale-105 transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-purple-100 text-sm font-medium mb-2">Среднее время (ч)</p>
+                <p className="text-4xl font-bold">{avgTime}</p>
+              </div>
+              <div className="bg-white/20 p-4 rounded-xl">
+                <TrendingUp className="h-8 w-8" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <div className="flex items-center">
-              <Calendar className="h-8 w-8 text-orange-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Общее время (ч)</p>
-                <p className="text-2xl font-bold text-gray-900">{totalTime}</p>
+          <div className="bg-gradient-to-br from-orange-500 to-orange-600 p-8 rounded-2xl shadow-xl text-white transform hover:scale-105 transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-orange-100 text-sm font-medium mb-2">Общее время (ч)</p>
+                <p className="text-4xl font-bold">{totalTime}</p>
+              </div>
+              <div className="bg-white/20 p-4 rounded-xl">
+                <Calendar className="h-8 w-8" />
               </div>
             </div>
           </div>
         </div>
 
         {/* Employees List */}
-        <div className="bg-white rounded-lg shadow-sm border">
-          <div className="px-6 py-4 border-b">
-            <h2 className="text-lg font-semibold text-gray-900">👥 Сотрудники</h2>
-            <p className="text-sm text-gray-600">Нажмите на карточку для просмотра истории</p>
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden">
+          <div className="px-8 py-6 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">👥 Сотрудники</h2>
+            <p className="text-gray-600">Нажмите на карточку для просмотра истории</p>
           </div>
           
-          <div className="divide-y">
+          <div className="divide-y divide-gray-100">
             {employees.map((employee) => (
-              <div key={employee.id} className="p-6 hover:bg-gray-50 cursor-pointer transition-colors">
+              <div key={employee.id} className="p-8 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 cursor-pointer transition-all duration-300 group">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <h3 className="text-lg font-medium text-gray-900">{employee.name}</h3>
-                    <p className="text-sm text-gray-600">ID: {employee.deviceId}</p>
+                    <h3 className="text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors mb-2">
+                      {employee.name}
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-1">ID: <span className="font-mono bg-gray-100 px-2 py-1 rounded">{employee.deviceId}</span></p>
                     <p className="text-sm text-gray-500">Последняя активность: {employee.lastSeen}</p>
                   </div>
                   
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-green-600 mb-1">
+                    <div className="text-3xl font-bold bg-gradient-to-r from-green-500 to-green-600 bg-clip-text text-transparent mb-2">
                       {employee.totalTimeToday}
                     </div>
-                    <div className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${
+                    <div className={`inline-flex px-4 py-2 rounded-full text-sm font-bold ${
                       employee.isInOffice
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
+                        ? 'bg-gradient-to-r from-green-100 to-green-200 text-green-800 border border-green-300'
+                        : 'bg-gradient-to-r from-red-100 to-red-200 text-red-800 border border-red-300'
                     }`}>
                       {employee.isInOffice ? 'В ОФИСЕ' : 'ВНЕ ОФИСА'}
                     </div>
@@ -217,16 +231,16 @@ export default function Dashboard() {
         </div>
 
         {/* Export Section */}
-        <div className="mt-8 bg-white rounded-lg shadow-sm border p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">📊 Экспорт данных</h2>
-          <div className="flex space-x-4">
-            <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+        <div className="mt-10 bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">📊 Экспорт данных</h2>
+          <div className="flex flex-wrap gap-4">
+            <button className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-8 py-4 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 font-semibold text-lg">
               📈 Excel
             </button>
-            <button className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
+            <button className="bg-gradient-to-r from-green-500 to-green-600 text-white px-8 py-4 rounded-xl hover:from-green-600 hover:to-green-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 font-semibold text-lg">
               📄 CSV
             </button>
-            <button className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors">
+            <button className="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-8 py-4 rounded-xl hover:from-purple-600 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 font-semibold text-lg">
               📋 Отчет
             </button>
           </div>
