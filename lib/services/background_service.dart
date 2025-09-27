@@ -12,33 +12,45 @@ class BackgroundService {
   
   /// Инициализирует фоновый сервис
   static Future<void> initialize() async {
-    final service = FlutterBackgroundService();
-    
-    await service.configure(
-      androidConfiguration: AndroidConfiguration(
-        onStart: onStart,
-        autoStart: true,
-        isForegroundMode: true,
-        notificationChannelId: 'office_tracker_channel',
-        initialNotificationTitle: 'In Office',
-        initialNotificationContent: 'Отслеживание офиса активно',
-        foregroundServiceNotificationId: 888,
-      ),
-      iosConfiguration: IosConfiguration(
-        autoStart: true,
-        onForeground: onStart,
-        onBackground: onIosBackground,
-      ),
-    );
+    try {
+      final service = FlutterBackgroundService();
+      
+      await service.configure(
+        androidConfiguration: AndroidConfiguration(
+          onStart: onStart,
+          autoStart: false, // Отключаем автозапуск для стабильности
+          isForegroundMode: true,
+          notificationChannelId: 'office_tracker_channel',
+          initialNotificationTitle: 'In Office',
+          initialNotificationContent: 'Отслеживание офиса активно',
+          foregroundServiceNotificationId: 888,
+        ),
+        iosConfiguration: IosConfiguration(
+          autoStart: false, // Отключаем автозапуск для стабильности
+          onForeground: onStart,
+          onBackground: onIosBackground,
+        ),
+      );
+      print('Фоновый сервис инициализирован');
+    } catch (e) {
+      print('Ошибка при инициализации фонового сервиса: $e');
+    }
   }
 
   /// Запускает фоновый сервис
   static Future<void> start() async {
-    final service = FlutterBackgroundService();
-    final isRunning = await service.isRunning();
-    
-    if (!isRunning) {
-      await service.startService();
+    try {
+      final service = FlutterBackgroundService();
+      final isRunning = await service.isRunning();
+      
+      if (!isRunning) {
+        await service.startService();
+        print('Фоновый сервис запущен');
+      } else {
+        print('Фоновый сервис уже запущен');
+      }
+    } catch (e) {
+      print('Ошибка при запуске фонового сервиса: $e');
     }
   }
 
@@ -60,18 +72,19 @@ class BackgroundService {
 void onStart(ServiceInstance service) async {
   print('Фоновый сервис запущен');
   
-  // Устанавливаем уведомление (если поддерживается)
-  if (service is AndroidServiceInstance) {
-    service.setForegroundNotificationInfo(
-      title: "In Office",
-      content: "Отслеживание офиса активно",
-    );
-  }
-
-  // Запускаем периодическую проверку
-  Timer.periodic(const Duration(minutes: 2), (timer) async {
+  try {
+    // Устанавливаем уведомление (если поддерживается)
     if (service is AndroidServiceInstance) {
-      if (await service.isForegroundService()) {
+      service.setForegroundNotificationInfo(
+        title: "In Office",
+        content: "Отслеживание офиса активно",
+      );
+    }
+
+    // Запускаем периодическую проверку
+    Timer.periodic(const Duration(minutes: 2), (timer) async {
+      try {
+        print('Фоновая проверка запущена');
         await _checkOfficeStatus();
         
         // Обновляем уведомление
@@ -82,9 +95,14 @@ void onStart(ServiceInstance service) async {
             content: isInOffice ? "В офисе" : "Вне офиса",
           );
         }
+        print('Фоновая проверка завершена: $isInOffice');
+      } catch (e) {
+        print('Ошибка в фоновой проверке: $e');
       }
-    }
-  });
+    });
+  } catch (e) {
+    print('Ошибка при запуске фонового сервиса: $e');
+  }
 }
 
 /// Проверяет статус офиса

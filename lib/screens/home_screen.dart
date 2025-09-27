@@ -36,17 +36,26 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Инициализирует приложение
   Future<void> _initializeApp() async {
-    // Инициализируем фоновый сервис
-    await BackgroundService.initialize();
-    
-    // Запускаем фоновый сервис
-    await BackgroundService.start();
-    
-    // Автоматически запускаем отслеживание при старте
-    if (!TrackingService.isTracking) {
-      await TrackingService.startTracking();
+    try {
+      // Инициализируем фоновый сервис
+      await BackgroundService.initialize();
+      
+      // Запускаем фоновый сервис
+      await BackgroundService.start();
+      
+      // Автоматически запускаем отслеживание при старте
+      if (!TrackingService.isTracking) {
+        await TrackingService.startTracking();
+      }
+      await _loadData();
+    } catch (e) {
+      print('Ошибка при инициализации: $e');
+      // Продолжаем работу даже если фоновый сервис не запустился
+      if (!TrackingService.isTracking) {
+        await TrackingService.startTracking();
+      }
+      await _loadData();
     }
-    await _loadData();
   }
 
   @override
