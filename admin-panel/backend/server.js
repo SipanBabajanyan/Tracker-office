@@ -52,40 +52,105 @@ db.serialize(() => {
 
 // Получить всех сотрудников
 app.get('/api/employees', (req, res) => {
-    const query = `
-        SELECT 
-            e.id,
-            e.name,
-            e.device_id,
-            e.created_at,
-            os.is_active as is_in_office,
-            os.start_time,
-            COALESCE(ds.total_minutes, 0) as total_minutes_today,
-            MAX(os.created_at) as last_activity
-        FROM employees e
-        LEFT JOIN office_sessions os ON e.id = os.employee_id AND os.is_active = 1
-        LEFT JOIN daily_stats ds ON e.id = ds.employee_id AND ds.date = DATE('now')
-        GROUP BY e.id
-        ORDER BY e.name
+    // Сначала получаем все уникальные device_id из сессий
+    const getUniqueDevicesQuery = `
+        SELECT DISTINCT device_id 
+        FROM office_sessions 
+        WHERE device_id IS NOT NULL
+        UNION
+        SELECT DISTINCT device_id 
+        FROM employees 
+        WHERE device_id IS NOT NULL
     `;
 
-    db.all(query, [], (err, rows) => {
+    db.all(getUniqueDevicesQuery, [], (err, deviceRows) => {
         if (err) {
-            console.error('Ошибка получения сотрудников:', err);
+            console.error('Ошибка получения устройств:', err);
             return res.status(500).json({ error: 'Ошибка базы данных' });
         }
 
-        const employees = rows.map(row => ({
-            id: row.id,
-            name: row.name,
-            deviceId: row.device_id,
-            isInOffice: Boolean(row.is_in_office),
-            startTime: row.start_time ? moment(row.start_time).format('HH:mm') : null,
-            totalTimeToday: formatTime(row.total_minutes_today),
-            lastSeen: row.last_activity ? moment(row.last_activity).fromNow() : 'Никогда'
-        }));
+        // Для каждого устройства создаем или получаем сотрудника
+        const processDevices = async () => {
+            const employees = [];
+            
+            for (const deviceRow of deviceRows) {
+                const deviceId = deviceRow.device_id;
+                
+                // Проверяем, есть ли уже сотрудник с таким device_id
+                const existingEmployee = await new Promise((resolve) => {
+                    db.get('SELECT * FROM employees WHERE device_id = ?', [deviceId], (err, row) => {
+                        resolve(row);
+                    });
+                });
 
-        res.json(employees);
+                let employeeId;
+                let employeeName;
+
+                if (existingEmployee) {
+                    employeeId = existingEmployee.id;
+                    employeeName = existingEmployee.name;
+                } else {
+                    // Создаем нового сотрудника с пустым именем
+                    const insertQuery = 'INSERT INTO employees (name, device_id) VALUES (?, ?)';
+                    const newEmployee = await new Promise((resolve, reject) => {
+                        db.run(insertQuery, ['', deviceId], function(err) {
+                            if (err) reject(err);
+                            else resolve({ id: this.lastID, name: '' });
+                        });
+                    });
+                    employeeId = newEmployee.id;
+                    employeeName = '';
+                }
+
+                // Получаем данные о сессиях и статистике
+                const employeeData = await new Promise((resolve) => {
+                    const query = `
+                        SELECT 
+                            e.id,
+                            e.name,
+                            e.device_id,
+                            e.created_at,
+                            os.is_active as is_in_office,
+                            os.start_time,
+                            COALESCE(ds.total_minutes, 0) as total_minutes_today,
+                            MAX(os.created_at) as last_activity
+                        FROM employees e
+                        LEFT JOIN office_sessions os ON e.id = os.employee_id AND os.is_active = 1
+                        LEFT JOIN daily_stats ds ON e.id = ds.employee_id AND ds.date = DATE('now')
+                        WHERE e.id = ?
+                        GROUP BY e.id
+                    `;
+                    
+                    db.get(query, [employeeId], (err, row) => {
+                        if (err) {
+                            console.error('Ошибка получения данных сотрудника:', err);
+                            resolve(null);
+                        } else {
+                            resolve(row);
+                        }
+                    });
+                });
+
+                if (employeeData) {
+                    employees.push({
+                        id: employeeData.id,
+                        name: employeeData.name || '',
+                        deviceId: employeeData.device_id,
+                        isInOffice: Boolean(employeeData.is_in_office),
+                        startTime: employeeData.start_time ? moment(employeeData.start_time).format('HH:mm') : null,
+                        totalTimeToday: formatTime(employeeData.total_minutes_today),
+                        lastSeen: employeeData.last_activity ? moment(employeeData.last_activity).fromNow() : 'Никогда'
+                    });
+                }
+            }
+
+            res.json(employees);
+        };
+
+        processDevices().catch(err => {
+            console.error('Ошибка обработки устройств:', err);
+            res.status(500).json({ error: 'Ошибка обработки данных' });
+        });
     });
 });
 
@@ -153,6 +218,30 @@ app.post('/api/employees', (req, res) => {
             id: this.lastID, 
             message: 'Сотрудник добавлен успешно' 
         });
+    });
+});
+
+// Обновить имя сотрудника
+app.put('/api/employees/:id', (req, res) => {
+    const { id } = req.params;
+    const { name } = req.body;
+
+    if (!name) {
+        return res.status(400).json({ error: 'Имя обязательно' });
+    }
+
+    const query = 'UPDATE employees SET name = ? WHERE id = ?';
+    db.run(query, [name, id], function(err) {
+        if (err) {
+            console.error('Ошибка обновления сотрудника:', err);
+            return res.status(500).json({ error: 'Ошибка базы данных' });
+        }
+
+        if (this.changes === 0) {
+            return res.status(404).json({ error: 'Сотрудник не найден' });
+        }
+
+        res.json({ message: 'Имя сотрудника обновлено' });
     });
 });
 
