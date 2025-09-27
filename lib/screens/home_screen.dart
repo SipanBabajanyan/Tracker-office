@@ -114,7 +114,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('Office Tracker'),
+        title: const Text('In Office'),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
         elevation: 0,
