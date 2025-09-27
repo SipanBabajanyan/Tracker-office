@@ -304,6 +304,56 @@ function formatTime(minutes) {
     return `${hours}:${mins.toString().padStart(2, '0')}`;
 }
 
+// Получить историю сотрудника
+app.get('/api/employee/:id/history', (req, res) => {
+    const employeeId = req.params.id;
+    const period = req.query.period || 'today';
+    
+    let dateFilter = '';
+    switch(period) {
+        case 'today':
+            dateFilter = 'AND date = DATE("now")';
+            break;
+        case 'week':
+            dateFilter = 'AND date >= DATE("now", "-7 days")';
+            break;
+        case 'month':
+            dateFilter = 'AND date >= DATE("now", "-30 days")';
+            break;
+        case 'year':
+            dateFilter = 'AND date >= DATE("now", "-365 days")';
+            break;
+    }
+
+    const query = `
+        SELECT 
+            date,
+            total_minutes,
+            CASE 
+                WHEN total_minutes > 0 THEN 'В офисе'
+                ELSE 'Вне офиса'
+            END as status
+        FROM daily_stats 
+        WHERE employee_id = ? ${dateFilter}
+        ORDER BY date DESC
+    `;
+
+    db.all(query, [employeeId], (err, rows) => {
+        if (err) {
+            console.error('Ошибка получения истории сотрудника:', err);
+            return res.status(500).json({ error: 'Ошибка базы данных' });
+        }
+
+        const history = rows.map(row => ({
+            date: row.date,
+            time: formatTime(row.total_minutes),
+            status: row.status
+        }));
+
+        res.json(history);
+    });
+});
+
 // Запуск сервера
 app.listen(PORT, () => {
     console.log(`🚀 Сервер запущен на порту ${PORT}`);
