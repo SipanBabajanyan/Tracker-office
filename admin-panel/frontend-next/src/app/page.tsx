@@ -202,7 +202,11 @@ export default function Dashboard() {
           
           <div className="divide-y divide-gray-100">
             {employees.map((employee) => (
-              <div key={employee.id} className="p-8 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 cursor-pointer transition-all duration-300 group">
+              <div 
+                key={employee.id} 
+                onClick={() => router.push(`/employee/${employee.id}`)}
+                className="p-8 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 cursor-pointer transition-all duration-300 group"
+              >
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <h3 className="text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors mb-2">
