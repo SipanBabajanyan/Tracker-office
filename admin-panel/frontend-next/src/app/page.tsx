@@ -12,6 +12,8 @@ interface Employee {
   isInOffice: boolean;
   totalTimeToday: string;
   lastSeen: string;
+  targetHours?: number;
+  coefficient?: number;
 }
 
 export default function Dashboard() {
@@ -220,6 +222,14 @@ export default function Dashboard() {
                     <div className="text-3xl font-bold bg-gradient-to-r from-green-500 to-green-600 bg-clip-text text-transparent mb-2">
                       {employee.totalTimeToday}
                     </div>
+                    {employee.coefficient !== undefined && (
+                      <div className={`text-lg font-bold mb-2 ${
+                        employee.coefficient >= 100 ? 'text-green-600' : 
+                        employee.coefficient >= 80 ? 'text-yellow-600' : 'text-red-600'
+                      }`}>
+                        {employee.coefficient}%
+                      </div>
+                    )}
                     <div className={`inline-flex px-4 py-2 rounded-full text-sm font-bold ${
                       employee.isInOffice
                         ? 'bg-gradient-to-r from-green-100 to-green-200 text-green-800 border border-green-300'

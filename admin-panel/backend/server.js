@@ -22,6 +22,7 @@ db.serialize(() => {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         device_id TEXT UNIQUE NOT NULL,
+        target_hours_per_day INTEGER DEFAULT 8,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
@@ -327,15 +328,17 @@ app.get('/api/employee/:id/history', (req, res) => {
 
     const query = `
         SELECT 
-            date,
-            total_minutes,
+            ds.date,
+            ds.total_minutes,
+            e.target_hours_per_day,
             CASE 
-                WHEN total_minutes > 0 THEN 'В офисе'
+                WHEN ds.total_minutes > 0 THEN 'В офисе'
                 ELSE 'Вне офиса'
             END as status
-        FROM daily_stats 
-        WHERE employee_id = ? ${dateFilter}
-        ORDER BY date DESC
+        FROM daily_stats ds
+        JOIN employees e ON ds.employee_id = e.id
+        WHERE ds.employee_id = ? ${dateFilter}
+        ORDER BY ds.date DESC
     `;
 
     db.all(query, [employeeId], (err, rows) => {
@@ -344,13 +347,108 @@ app.get('/api/employee/:id/history', (req, res) => {
             return res.status(500).json({ error: 'Ошибка базы данных' });
         }
 
-        const history = rows.map(row => ({
-            date: row.date,
-            time: formatTime(row.total_minutes),
-            status: row.status
-        }));
+        const history = rows.map(row => {
+            const targetMinutes = row.target_hours_per_day * 60;
+            const coefficient = targetMinutes > 0 ? (row.total_minutes / targetMinutes * 100) : 0;
+            const timeDiff = row.total_minutes - targetMinutes;
+            
+            return {
+                date: row.date,
+                time: formatTime(row.total_minutes),
+                status: row.status,
+                targetTime: formatTime(targetMinutes),
+                coefficient: Math.round(coefficient),
+                timeDiff: timeDiff > 0 ? `+${formatTime(timeDiff)}` : formatTime(timeDiff),
+                timeDiffMinutes: timeDiff
+            };
+        });
 
         res.json(history);
+    });
+});
+
+// Получить коэффициенты сотрудника
+app.get('/api/employee/:id/coefficients', (req, res) => {
+    const employeeId = req.params.id;
+    const period = req.query.period || 'today';
+    
+    let dateFilter = '';
+    switch(period) {
+        case 'today':
+            dateFilter = 'AND date = DATE("now")';
+            break;
+        case 'week':
+            dateFilter = 'AND date >= DATE("now", "-7 days")';
+            break;
+        case 'month':
+            dateFilter = 'AND date >= DATE("now", "-30 days")';
+            break;
+        case 'year':
+            dateFilter = 'AND date >= DATE("now", "-365 days")';
+            break;
+    }
+
+    const query = `
+        SELECT 
+            e.target_hours_per_day,
+            COALESCE(AVG(ds.total_minutes), 0) as avg_minutes,
+            COALESCE(SUM(ds.total_minutes), 0) as total_minutes,
+            COUNT(ds.date) as days_count
+        FROM employees e
+        LEFT JOIN daily_stats ds ON e.id = ds.employee_id ${dateFilter}
+        WHERE e.id = ?
+        GROUP BY e.id, e.target_hours_per_day
+    `;
+
+    db.get(query, [employeeId], (err, row) => {
+        if (err) {
+            console.error('Ошибка получения коэффициентов:', err);
+            return res.status(500).json({ error: 'Ошибка базы данных' });
+        }
+
+        if (!row) {
+            return res.status(404).json({ error: 'Сотрудник не найден' });
+        }
+
+        const targetMinutes = row.target_hours_per_day * 60;
+        const avgCoefficient = targetMinutes > 0 ? (row.avg_minutes / targetMinutes * 100) : 0;
+        const totalCoefficient = targetMinutes > 0 ? (row.total_minutes / (targetMinutes * row.days_count) * 100) : 0;
+        
+        res.json({
+            targetHours: row.target_hours_per_day,
+            targetMinutes: targetMinutes,
+            avgMinutes: Math.round(row.avg_minutes),
+            totalMinutes: Math.round(row.total_minutes),
+            daysCount: row.days_count,
+            avgCoefficient: Math.round(avgCoefficient),
+            totalCoefficient: Math.round(totalCoefficient),
+            avgTimeDiff: Math.round(row.avg_minutes - targetMinutes),
+            totalTimeDiff: Math.round(row.total_minutes - (targetMinutes * row.days_count))
+        });
+    });
+});
+
+// Обновить целевые часы сотрудника
+app.put('/api/employee/:id/target-hours', (req, res) => {
+    const { id } = req.params;
+    const { targetHours } = req.body;
+
+    if (!targetHours || targetHours < 0 || targetHours > 24) {
+        return res.status(400).json({ error: 'Целевые часы должны быть от 0 до 24' });
+    }
+
+    const query = 'UPDATE employees SET target_hours_per_day = ? WHERE id = ?';
+    db.run(query, [targetHours, id], function(err) {
+        if (err) {
+            console.error('Ошибка обновления целевых часов:', err);
+            return res.status(500).json({ error: 'Ошибка базы данных' });
+        }
+
+        if (this.changes === 0) {
+            return res.status(404).json({ error: 'Сотрудник не найден' });
+        }
+
+        res.json({ message: 'Целевые часы обновлены', targetHours });
     });
 });
 

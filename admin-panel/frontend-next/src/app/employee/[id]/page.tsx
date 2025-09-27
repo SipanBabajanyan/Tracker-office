@@ -10,6 +10,22 @@ interface EmployeeHistory {
   time: string;
   status: string;
   total_minutes: number;
+  targetTime: string;
+  coefficient: number;
+  timeDiff: string;
+  timeDiffMinutes: number;
+}
+
+interface EmployeeCoefficients {
+  targetHours: number;
+  targetMinutes: number;
+  avgMinutes: number;
+  totalMinutes: number;
+  daysCount: number;
+  avgCoefficient: number;
+  totalCoefficient: number;
+  avgTimeDiff: number;
+  totalTimeDiff: number;
 }
 
 interface Employee {
@@ -24,10 +40,13 @@ interface Employee {
 export default function EmployeeDetail() {
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [history, setHistory] = useState<EmployeeHistory[]>([]);
+  const [coefficients, setCoefficients] = useState<EmployeeCoefficients | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentPeriod, setCurrentPeriod] = useState('today');
   const [editingName, setEditingName] = useState(false);
+  const [editingTargetHours, setEditingTargetHours] = useState(false);
   const [newName, setNewName] = useState('');
+  const [newTargetHours, setNewTargetHours] = useState(8);
   const { isAuthenticated, loading: authLoading } = useAuth();
   const router = useRouter();
   const params = useParams();
@@ -60,6 +79,12 @@ export default function EmployeeDetail() {
       const historyResponse = await fetch(`http://localhost:3000/api/employee/${employeeId}/history?period=${currentPeriod}`);
       const historyData = await historyResponse.json();
       setHistory(historyData);
+
+      // Загружаем коэффициенты
+      const coefficientsResponse = await fetch(`http://localhost:3000/api/employee/${employeeId}/coefficients?period=${currentPeriod}`);
+      const coefficientsData = await coefficientsResponse.json();
+      setCoefficients(coefficientsData);
+      setNewTargetHours(coefficientsData.targetHours);
     } catch (error) {
       console.error('Ошибка загрузки данных сотрудника:', error);
     } finally {
@@ -88,6 +113,27 @@ export default function EmployeeDetail() {
     }
   };
 
+  const handleUpdateTargetHours = async () => {
+    if (!employee || newTargetHours < 0 || newTargetHours > 24) return;
+
+    try {
+      const response = await fetch(`http://localhost:3000/api/employee/${employee.id}/target-hours`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ targetHours: newTargetHours }),
+      });
+
+      if (response.ok) {
+        setEditingTargetHours(false);
+        loadEmployeeData(); // Перезагружаем данные для обновления коэффициентов
+      }
+    } catch (error) {
+      console.error('Ошибка обновления целевых часов:', error);
+    }
+  };
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('ru-RU', {
@@ -99,7 +145,8 @@ export default function EmployeeDetail() {
   };
 
   const getTotalTimeForPeriod = () => {
-    return history.reduce((total, day) => total + day.total_minutes, 0);
+    if (!Array.isArray(history)) return 0;
+    return history.reduce((total, day) => total + (day.total_minutes || 0), 0);
   };
 
   const formatTime = (minutes: number) => {
@@ -274,7 +321,7 @@ export default function EmployeeDetail() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-green-100 text-sm font-medium mb-2">Дней в офисе</p>
-                <p className="text-3xl font-bold">{history.filter(h => h.total_minutes > 0).length}</p>
+                <p className="text-3xl font-bold">{Array.isArray(history) ? history.filter(h => h.total_minutes > 0).length : 0}</p>
               </div>
               <Calendar className="h-8 w-8 text-green-200" />
             </div>
@@ -289,6 +336,104 @@ export default function EmployeeDetail() {
                 </p>
               </div>
               <TrendingUp className="h-8 w-8 text-purple-200" />
+            </div>
+          </div>
+        </div>
+
+        {/* Coefficients Cards */}
+        {coefficients && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="bg-gradient-to-br from-orange-500 to-orange-600 p-6 rounded-2xl shadow-xl text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-orange-100 text-sm font-medium mb-2">Коэффициент</p>
+                  <p className="text-3xl font-bold">{coefficients.avgCoefficient}%</p>
+                </div>
+                <TrendingUp className="h-8 w-8 text-orange-200" />
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 p-6 rounded-2xl shadow-xl text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-indigo-100 text-sm font-medium mb-2">Целевые часы</p>
+                  <p className="text-3xl font-bold">{coefficients.targetHours}ч</p>
+                </div>
+                <Clock className="h-8 w-8 text-indigo-200" />
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-pink-500 to-pink-600 p-6 rounded-2xl shadow-xl text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-pink-100 text-sm font-medium mb-2">Разница времени</p>
+                  <p className={`text-3xl font-bold ${coefficients.avgTimeDiff >= 0 ? 'text-green-200' : 'text-red-200'}`}>
+                    {coefficients.avgTimeDiff >= 0 ? '+' : ''}{formatTime(Math.abs(coefficients.avgTimeDiff || 0))}
+                  </p>
+                </div>
+                <Activity className="h-8 w-8 text-pink-200" />
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-teal-500 to-teal-600 p-6 rounded-2xl shadow-xl text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-teal-100 text-sm font-medium mb-2">Общий коэффициент</p>
+                  <p className="text-3xl font-bold">{coefficients.totalCoefficient}%</p>
+                </div>
+                <TrendingUp className="h-8 w-8 text-teal-200" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Target Hours Settings */}
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-6 mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">🎯 Настройки целевых часов</h3>
+              <p className="text-gray-600">Установите количество часов, которое сотрудник должен проводить в офисе ежедневно</p>
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              {editingTargetHours ? (
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="number"
+                    min="0"
+                    max="24"
+                    value={newTargetHours}
+                    onChange={(e) => setNewTargetHours(Number(e.target.value))}
+                    className="w-20 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="text-gray-600">часов</span>
+                  <button
+                    onClick={handleUpdateTargetHours}
+                    className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors"
+                  >
+                    ✓
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingTargetHours(false);
+                      setNewTargetHours(coefficients?.targetHours || 8);
+                    }}
+                    className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-3">
+                  <span className="text-2xl font-bold text-gray-900">{coefficients?.targetHours || 8} часов</span>
+                  <button
+                    onClick={() => setEditingTargetHours(true)}
+                    className="text-blue-500 hover:text-blue-600 transition-colors"
+                  >
+                    ✏️
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -309,7 +454,7 @@ export default function EmployeeDetail() {
                 <p>Нет данных за выбранный период</p>
               </div>
             ) : (
-              history.map((day, index) => (
+              Array.isArray(history) ? history.map((day, index) => (
                 <div key={index} className="p-6 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-300">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
@@ -322,20 +467,51 @@ export default function EmployeeDetail() {
                     </div>
                     
                     <div className="text-right">
-                      <div className="text-2xl font-bold text-green-600 mb-1">
-                        {day.time}
-                      </div>
-                      <div className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${
-                        day.status === 'В офисе'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {day.status}
+                      <div className="flex items-center space-x-4">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-green-600 mb-1">
+                            {day.time}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            из {day.targetTime}
+                          </div>
+                        </div>
+                        
+                        <div className="text-center">
+                          <div className={`text-2xl font-bold mb-1 ${
+                            day.coefficient >= 100 ? 'text-green-600' : 
+                            day.coefficient >= 80 ? 'text-yellow-600' : 'text-red-600'
+                          }`}>
+                            {day.coefficient}%
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            коэффициент
+                          </div>
+                        </div>
+                        
+                        <div className="text-center">
+                          <div className={`text-lg font-bold mb-1 ${
+                            day.timeDiffMinutes >= 0 ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                            {day.timeDiff}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            разница
+                          </div>
+                        </div>
+                        
+                        <div className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${
+                          day.status === 'В офисе'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {day.status}
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              ))
+              )) : null
             )}
           </div>
         </div>
