@@ -52,105 +52,26 @@ db.serialize(() => {
 
 // Получить всех сотрудников
 app.get('/api/employees', (req, res) => {
-    // Сначала получаем все уникальные device_id из сессий
-    const getUniqueDevicesQuery = `
-        SELECT DISTINCT device_id 
-        FROM office_sessions 
-        WHERE device_id IS NOT NULL
-        UNION
-        SELECT DISTINCT device_id 
-        FROM employees 
-        WHERE device_id IS NOT NULL
-    `;
-
-    db.all(getUniqueDevicesQuery, [], (err, deviceRows) => {
+    // Простой запрос для начала - получаем всех сотрудников
+    const query = 'SELECT * FROM employees ORDER BY name';
+    
+    db.all(query, [], (err, rows) => {
         if (err) {
-            console.error('Ошибка получения устройств:', err);
-            return res.status(500).json({ error: 'Ошибка базы данных' });
+            console.error('Ошибка получения сотрудников:', err);
+            return res.status(500).json({ error: 'Ошибка базы данных: ' + err.message });
         }
 
-        // Для каждого устройства создаем или получаем сотрудника
-        const processDevices = async () => {
-            const employees = [];
-            
-            for (const deviceRow of deviceRows) {
-                const deviceId = deviceRow.device_id;
-                
-                // Проверяем, есть ли уже сотрудник с таким device_id
-                const existingEmployee = await new Promise((resolve) => {
-                    db.get('SELECT * FROM employees WHERE device_id = ?', [deviceId], (err, row) => {
-                        resolve(row);
-                    });
-                });
+        const employees = rows.map(row => ({
+            id: row.id,
+            name: row.name || '',
+            deviceId: row.device_id || 'Неизвестно',
+            isInOffice: false, // Пока не интегрированы с мобильным приложением
+            startTime: null,
+            totalTimeToday: '0ч 0м',
+            lastSeen: 'Никогда'
+        }));
 
-                let employeeId;
-                let employeeName;
-
-                if (existingEmployee) {
-                    employeeId = existingEmployee.id;
-                    employeeName = existingEmployee.name;
-                } else {
-                    // Создаем нового сотрудника с пустым именем
-                    const insertQuery = 'INSERT INTO employees (name, device_id) VALUES (?, ?)';
-                    const newEmployee = await new Promise((resolve, reject) => {
-                        db.run(insertQuery, ['', deviceId], function(err) {
-                            if (err) reject(err);
-                            else resolve({ id: this.lastID, name: '' });
-                        });
-                    });
-                    employeeId = newEmployee.id;
-                    employeeName = '';
-                }
-
-                // Получаем данные о сессиях и статистике
-                const employeeData = await new Promise((resolve) => {
-                    const query = `
-                        SELECT 
-                            e.id,
-                            e.name,
-                            e.device_id,
-                            e.created_at,
-                            os.is_active as is_in_office,
-                            os.start_time,
-                            COALESCE(ds.total_minutes, 0) as total_minutes_today,
-                            MAX(os.created_at) as last_activity
-                        FROM employees e
-                        LEFT JOIN office_sessions os ON e.id = os.employee_id AND os.is_active = 1
-                        LEFT JOIN daily_stats ds ON e.id = ds.employee_id AND ds.date = DATE('now')
-                        WHERE e.id = ?
-                        GROUP BY e.id
-                    `;
-                    
-                    db.get(query, [employeeId], (err, row) => {
-                        if (err) {
-                            console.error('Ошибка получения данных сотрудника:', err);
-                            resolve(null);
-                        } else {
-                            resolve(row);
-                        }
-                    });
-                });
-
-                if (employeeData) {
-                    employees.push({
-                        id: employeeData.id,
-                        name: employeeData.name || '',
-                        deviceId: employeeData.device_id,
-                        isInOffice: Boolean(employeeData.is_in_office),
-                        startTime: employeeData.start_time ? moment(employeeData.start_time).format('HH:mm') : null,
-                        totalTimeToday: formatTime(employeeData.total_minutes_today),
-                        lastSeen: employeeData.last_activity ? moment(employeeData.last_activity).fromNow() : 'Никогда'
-                    });
-                }
-            }
-
-            res.json(employees);
-        };
-
-        processDevices().catch(err => {
-            console.error('Ошибка обработки устройств:', err);
-            res.status(500).json({ error: 'Ошибка обработки данных' });
-        });
+        res.json(employees);
     });
 });
 
