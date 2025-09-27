@@ -308,26 +308,32 @@ function formatTime(minutes) {
     return `${hours}:${mins.toString().padStart(2, '0')}`;
 }
 
-// Получить историю сотрудника
-app.get('/api/employee/:id/history', (req, res) => {
-    const employeeId = req.params.id;
-    const period = req.query.period || 'today';
-    
-    let dateFilter = '';
-    switch(period) {
-        case 'today':
-            dateFilter = 'AND date = DATE("now")';
-            break;
-        case 'week':
-            dateFilter = 'AND date >= DATE("now", "-7 days")';
-            break;
-        case 'month':
-            dateFilter = 'AND date >= DATE("now", "-30 days")';
-            break;
-        case 'year':
-            dateFilter = 'AND date >= DATE("now", "-365 days")';
-            break;
-    }
+        // Получить историю сотрудника
+        app.get('/api/employee/:id/history', (req, res) => {
+            const employeeId = req.params.id;
+            const period = req.query.period || 'today';
+            
+            let dateFilter = '';
+            switch(period) {
+                case 'today':
+                    dateFilter = 'AND date = DATE("now")';
+                    break;
+                case 'week':
+                    dateFilter = 'AND date >= DATE("now", "-7 days")';
+                    break;
+                case 'month':
+                    dateFilter = 'AND date >= DATE("now", "-30 days")';
+                    break;
+                case 'quarter':
+                    dateFilter = 'AND date >= DATE("now", "-90 days")';
+                    break;
+                case '6months':
+                    dateFilter = 'AND date >= DATE("now", "-180 days")';
+                    break;
+                case 'year':
+                    dateFilter = 'AND date >= DATE("now", "-365 days")';
+                    break;
+            }
 
     const query = `
         SELECT 
@@ -370,26 +376,32 @@ app.get('/api/employee/:id/history', (req, res) => {
     });
 });
 
-// Получить коэффициенты сотрудника
-app.get('/api/employee/:id/coefficients', (req, res) => {
-    const employeeId = req.params.id;
-    const period = req.query.period || 'today';
-    
-    let dateFilter = '';
-    switch(period) {
-        case 'today':
-            dateFilter = 'AND date = DATE("now")';
-            break;
-        case 'week':
-            dateFilter = 'AND date >= DATE("now", "-7 days")';
-            break;
-        case 'month':
-            dateFilter = 'AND date >= DATE("now", "-30 days")';
-            break;
-        case 'year':
-            dateFilter = 'AND date >= DATE("now", "-365 days")';
-            break;
-    }
+        // Получить коэффициенты сотрудника
+        app.get('/api/employee/:id/coefficients', (req, res) => {
+            const employeeId = req.params.id;
+            const period = req.query.period || 'today';
+            
+            let dateFilter = '';
+            switch(period) {
+                case 'today':
+                    dateFilter = 'AND date = DATE("now")';
+                    break;
+                case 'week':
+                    dateFilter = 'AND date >= DATE("now", "-7 days")';
+                    break;
+                case 'month':
+                    dateFilter = 'AND date >= DATE("now", "-30 days")';
+                    break;
+                case 'quarter':
+                    dateFilter = 'AND date >= DATE("now", "-90 days")';
+                    break;
+                case '6months':
+                    dateFilter = 'AND date >= DATE("now", "-180 days")';
+                    break;
+                case 'year':
+                    dateFilter = 'AND date >= DATE("now", "-365 days")';
+                    break;
+            }
 
     const query = `
         SELECT 

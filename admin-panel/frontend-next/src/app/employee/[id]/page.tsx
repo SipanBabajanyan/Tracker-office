@@ -47,6 +47,8 @@ export default function EmployeeDetail() {
   const [editingTargetHours, setEditingTargetHours] = useState(false);
   const [newName, setNewName] = useState('');
   const [newTargetHours, setNewTargetHours] = useState(8);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(30);
   const { isAuthenticated, loading: authLoading } = useAuth();
   const router = useRouter();
   const params = useParams();
@@ -153,6 +155,23 @@ export default function EmployeeDetail() {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return `${hours}ч ${mins}м`;
+  };
+
+  // Пагинация
+  const getPaginatedHistory = () => {
+    if (!Array.isArray(history)) return [];
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return history.slice(startIndex, endIndex);
+  };
+
+  const getTotalPages = () => {
+    if (!Array.isArray(history)) return 0;
+    return Math.ceil(history.length / itemsPerPage);
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
   };
 
   if (loading || authLoading) {
@@ -281,64 +300,34 @@ export default function EmployeeDetail() {
         {/* Period Selector */}
         <div className="mb-8">
           <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-2 shadow-lg border border-white/20">
-            <div className="flex space-x-2">
-              {['today', 'week', 'month', 'year'].map((period) => (
+            <div className="flex flex-wrap gap-2">
+              {[
+                { key: 'today', label: 'Сегодня' },
+                { key: 'week', label: 'Неделя' },
+                { key: 'month', label: 'Месяц' },
+                { key: 'quarter', label: 'Квартал' },
+                { key: '6months', label: '6 месяцев' },
+                { key: 'year', label: 'Год' }
+              ].map((period) => (
                 <button
-                  key={period}
+                  key={period.key}
                   onClick={() => {
-                    setCurrentPeriod(period);
+                    setCurrentPeriod(period.key);
                     loadEmployeeData();
                   }}
-                  className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
-                    currentPeriod === period
+                  className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 text-sm ${
+                    currentPeriod === period.key
                       ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg transform scale-105'
                       : 'text-gray-700 hover:bg-white/50 hover:shadow-md'
                   }`}
                 >
-                  {period === 'today' && 'Сегодня'}
-                  {period === 'week' && 'Неделя'}
-                  {period === 'month' && 'Месяц'}
-                  {period === 'year' && 'Год'}
+                  {period.label}
                 </button>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-2xl shadow-xl text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-blue-100 text-sm font-medium mb-2">Общее время</p>
-                <p className="text-3xl font-bold">{formatTime(getTotalTimeForPeriod())}</p>
-              </div>
-              <Clock className="h-8 w-8 text-blue-200" />
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-green-500 to-green-600 p-6 rounded-2xl shadow-xl text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-green-100 text-sm font-medium mb-2">Дней в офисе</p>
-                <p className="text-3xl font-bold">{Array.isArray(history) ? history.filter(h => h.total_minutes > 0).length : 0}</p>
-              </div>
-              <Calendar className="h-8 w-8 text-green-200" />
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-2xl shadow-xl text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-purple-100 text-sm font-medium mb-2">Среднее время</p>
-                <p className="text-3xl font-bold">
-                  {history.length > 0 ? formatTime(Math.round(getTotalTimeForPeriod() / history.length)) : '0ч 0м'}
-                </p>
-              </div>
-              <TrendingUp className="h-8 w-8 text-purple-200" />
-            </div>
-          </div>
-        </div>
 
         {/* Coefficients Cards */}
         {coefficients && (
@@ -447,73 +436,117 @@ export default function EmployeeDetail() {
             </h3>
           </div>
           
-          <div className="divide-y divide-gray-100">
-            {history.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                <p>Нет данных за выбранный период</p>
-              </div>
-            ) : (
-              Array.isArray(history) ? history.map((day, index) => (
-                <div key={index} className="p-6 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-300">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <h4 className="text-lg font-semibold text-gray-900">
-                        {formatDate(day.date)}
-                      </h4>
-                      <p className="text-sm text-gray-600">
-                        {day.date}
-                      </p>
-                    </div>
-                    
-                    <div className="text-right">
-                      <div className="flex items-center space-x-4">
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-green-600 mb-1">
-                            {day.time}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            из {day.targetTime}
-                          </div>
-                        </div>
-                        
-                        <div className="text-center">
-                          <div className={`text-2xl font-bold mb-1 ${
-                            day.coefficient >= 100 ? 'text-green-600' : 
-                            day.coefficient >= 80 ? 'text-yellow-600' : 'text-red-600'
-                          }`}>
-                            {day.coefficient}%
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            коэффициент
-                          </div>
-                        </div>
-                        
-                        <div className="text-center">
-                          <div className={`text-lg font-bold mb-1 ${
-                            day.timeDiffMinutes >= 0 ? 'text-green-600' : 'text-red-600'
-                          }`}>
-                            {day.timeDiff}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            разница
-                          </div>
-                        </div>
-                        
-                        <div className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${
-                          day.status === 'В офисе'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {day.status}
-                        </div>
+                  <div className="divide-y divide-gray-100">
+                    {history.length === 0 ? (
+                      <div className="p-8 text-center text-gray-500">
+                        <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                        <p>Нет данных за выбранный период</p>
                       </div>
-                    </div>
+                    ) : (
+                      <>
+                        {getPaginatedHistory().map((day, index) => (
+                          <div key={index} className="p-6 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-300">
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <h4 className="text-lg font-semibold text-gray-900">
+                                  {formatDate(day.date)}
+                                </h4>
+                                <p className="text-sm text-gray-600">
+                                  {day.date}
+                                </p>
+                              </div>
+                              
+                              <div className="text-right">
+                                <div className="flex items-center space-x-4">
+                                  <div className="text-center">
+                                    <div className="text-2xl font-bold text-green-600 mb-1">
+                                      {day.time}
+                                    </div>
+                                    <div className="text-sm text-gray-500">
+                                      из {day.targetTime}
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="text-center">
+                                    <div className={`text-2xl font-bold mb-1 ${
+                                      day.coefficient >= 100 ? 'text-green-600' : 
+                                      day.coefficient >= 80 ? 'text-yellow-600' : 'text-red-600'
+                                    }`}>
+                                      {day.coefficient}%
+                                    </div>
+                                    <div className="text-sm text-gray-500">
+                                      коэффициент
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="text-center">
+                                    <div className={`text-lg font-bold mb-1 ${
+                                      day.timeDiffMinutes >= 0 ? 'text-green-600' : 'text-red-600'
+                                    }`}>
+                                      {day.timeDiff}
+                                    </div>
+                                    <div className="text-sm text-gray-500">
+                                      разница
+                                    </div>
+                                  </div>
+                                  
+                                  <div className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${
+                                    day.status === 'В офисе'
+                                      ? 'bg-green-100 text-green-800'
+                                      : 'bg-red-100 text-red-800'
+                                  }`}>
+                                    {day.status}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        
+                        {/* Пагинация */}
+                        {getTotalPages() > 1 && (
+                          <div className="p-6 bg-gray-50 border-t border-gray-200">
+                            <div className="flex items-center justify-between">
+                              <div className="text-sm text-gray-600">
+                                Показано {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, history.length)} из {history.length} записей
+                              </div>
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() => handlePageChange(currentPage - 1)}
+                                  disabled={currentPage === 1}
+                                  className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  ← Назад
+                                </button>
+                                
+                                {Array.from({ length: getTotalPages() }, (_, i) => i + 1).map((page) => (
+                                  <button
+                                    key={page}
+                                    onClick={() => handlePageChange(page)}
+                                    className={`px-3 py-2 text-sm font-medium rounded-lg ${
+                                      currentPage === page
+                                        ? 'bg-blue-500 text-white'
+                                        : 'text-gray-500 bg-white border border-gray-300 hover:bg-gray-50'
+                                    }`}
+                                  >
+                                    {page}
+                                  </button>
+                                ))}
+                                
+                                <button
+                                  onClick={() => handlePageChange(currentPage + 1)}
+                                  disabled={currentPage === getTotalPages()}
+                                  className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Вперед →
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
-                </div>
-              )) : null
-            )}
-          </div>
         </div>
       </div>
     </div>

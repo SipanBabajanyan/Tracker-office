@@ -121,28 +121,32 @@ export default function Dashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Period Selector */}
-        <div className="mb-10">
-          <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-2 shadow-lg border border-white/20">
-            <div className="flex space-x-2">
-              {['today', 'week', 'month', 'year'].map((period) => (
-                <button
-                  key={period}
-                  onClick={() => setCurrentPeriod(period)}
-                  className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
-                    currentPeriod === period
-                      ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg transform scale-105'
-                      : 'text-gray-700 hover:bg-white/50 hover:shadow-md'
-                  }`}
-                >
-                  {period === 'today' && 'Сегодня'}
-                  {period === 'week' && 'Неделя'}
-                  {period === 'month' && 'Месяц'}
-                  {period === 'year' && 'Год'}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+                <div className="mb-10">
+                  <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-2 shadow-lg border border-white/20">
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { key: 'today', label: 'Сегодня' },
+                        { key: 'week', label: 'Неделя' },
+                        { key: 'month', label: 'Месяц' },
+                        { key: 'quarter', label: 'Квартал' },
+                        { key: '6months', label: '6 месяцев' },
+                        { key: 'year', label: 'Год' }
+                      ].map((period) => (
+                        <button
+                          key={period.key}
+                          onClick={() => setCurrentPeriod(period.key)}
+                          className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 text-sm ${
+                            currentPeriod === period.key
+                              ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg transform scale-105'
+                              : 'text-gray-700 hover:bg-white/50 hover:shadow-md'
+                          }`}
+                        >
+                          {period.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
