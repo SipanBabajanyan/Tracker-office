@@ -3,12 +3,14 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Lock, User } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { login } = useAuth();
   const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -16,9 +18,8 @@ export default function Login() {
     setLoading(true);
     setError('');
 
-    // Простая проверка (в реальном приложении будет API)
-    if (username === 'admin' && password === 'admin123') {
-      localStorage.setItem('isAuthenticated', 'true');
+    const success = login(username, password);
+    if (success) {
       router.push('/');
     } else {
       setError('Неверный логин или пароль');

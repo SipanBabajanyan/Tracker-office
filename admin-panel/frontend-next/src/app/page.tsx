@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Users, Clock, TrendingUp, Calendar, LogOut } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Employee {
   id: number;
@@ -17,18 +18,19 @@ export default function Dashboard() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPeriod, setCurrentPeriod] = useState('today');
+  const { isAuthenticated, logout, loading: authLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    // Проверяем авторизацию
-    const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-    if (!isAuthenticated) {
+    if (!authLoading && !isAuthenticated) {
       router.push('/login');
       return;
     }
     
-    loadEmployees();
-  }, [router]);
+    if (isAuthenticated) {
+      loadEmployees();
+    }
+  }, [isAuthenticated, authLoading, router]);
 
   const loadEmployees = async () => {
     try {
@@ -66,11 +68,10 @@ export default function Dashboard() {
   const totalTime = (employees.length * 7.5).toFixed(1);
 
   const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated');
-    router.push('/login');
+    logout();
   };
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -79,6 +80,10 @@ export default function Dashboard() {
         </div>
       </div>
     );
+  }
+
+  if (!isAuthenticated) {
+    return null;
   }
 
   return (
