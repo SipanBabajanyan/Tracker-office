@@ -333,6 +333,10 @@ function formatTime(minutes) {
                 case 'year':
                     dateFilter = 'AND date >= DATE("now", "-365 days")';
                     break;
+                case 'alltime':
+                    // Все время - без фильтра по дате
+                    dateFilter = '';
+                    break;
             }
 
     const query = `
@@ -400,6 +404,10 @@ function formatTime(minutes) {
                     break;
                 case 'year':
                     dateFilter = 'AND date >= DATE("now", "-365 days")';
+                    break;
+                case 'alltime':
+                    // Все время - без фильтра по дате
+                    dateFilter = '';
                     break;
             }
 
