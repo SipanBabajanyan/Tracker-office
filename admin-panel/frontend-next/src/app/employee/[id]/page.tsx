@@ -19,13 +19,14 @@ interface EmployeeHistory {
 interface EmployeeCoefficients {
   targetHours: number;
   targetMinutes: number;
+  totalTargetMinutes: number; // Общее целевое время за период
   avgMinutes: number;
   totalMinutes: number;
   daysCount: number;
   avgCoefficient: number;
   totalCoefficient: number;
   avgTimeDiff: number;
-  totalTimeDiff: number;
+  totalTimeDiff: number; // Разница времени за весь период
 }
 
 interface Employee {
@@ -165,6 +166,9 @@ export default function EmployeeDetail() {
   };
 
   const formatTime = (minutes: number) => {
+    if (isNaN(minutes) || minutes === undefined || minutes === null) {
+      return '0ч 0м';
+    }
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return `${hours}ч ${mins}м`;
@@ -353,45 +357,52 @@ export default function EmployeeDetail() {
         {/* Coefficients Cards */}
         {coefficients && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-gradient-to-br from-orange-500 to-orange-600 p-6 rounded-2xl shadow-xl text-white">
+            <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-orange-100 text-sm font-medium mb-2">Коэффициент</p>
-                  <p className="text-3xl font-bold">{coefficients.avgCoefficient}%</p>
+                  <p className="text-gray-600 text-sm font-medium mb-2">Коэффициент</p>
+                  <p className={`text-3xl font-bold ${
+                    coefficients.avgCoefficient >= 80 ? 'text-green-600' : 
+                    coefficients.avgCoefficient >= 50 ? 'text-orange-600' : 'text-red-600'
+                  }`}>
+                    {coefficients.avgCoefficient}%
+                  </p>
                 </div>
-                <TrendingUp className="h-8 w-8 text-orange-200" />
+                <TrendingUp className="h-8 w-8 text-gray-400" />
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 p-6 rounded-2xl shadow-xl text-white">
+            <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-indigo-100 text-sm font-medium mb-2">Целевые часы</p>
-                  <p className="text-3xl font-bold">{coefficients.targetHours}ч</p>
+                  <p className="text-gray-600 text-sm font-medium mb-2">Целевые часы</p>
+                  <p className="text-3xl font-bold text-gray-900">{formatTime(coefficients.totalTargetMinutes)}</p>
                 </div>
-                <Clock className="h-8 w-8 text-indigo-200" />
+                <Clock className="h-8 w-8 text-gray-400" />
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-pink-500 to-pink-600 p-6 rounded-2xl shadow-xl text-white">
+            <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-pink-100 text-sm font-medium mb-2">Разница времени</p>
-                  <p className={`text-3xl font-bold ${coefficients.avgTimeDiff >= 0 ? 'text-green-200' : 'text-red-200'}`}>
+                  <p className="text-gray-600 text-sm font-medium mb-2">Разница времени (в среднем)</p>
+                  <p className={`text-3xl font-bold ${coefficients.avgTimeDiff >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                     {coefficients.avgTimeDiff >= 0 ? '+' : ''}{formatTime(Math.abs(coefficients.avgTimeDiff || 0))}
                   </p>
                 </div>
-                <Activity className="h-8 w-8 text-pink-200" />
+                <Activity className="h-8 w-8 text-gray-400" />
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-teal-500 to-teal-600 p-6 rounded-2xl shadow-xl text-white">
+            <div className="bg-white p-6 rounded-2xl shadow-xl border border-gray-200">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-teal-100 text-sm font-medium mb-2">Общий коэффициент</p>
-                  <p className="text-3xl font-bold">{coefficients.totalCoefficient}%</p>
+                  <p className="text-gray-600 text-sm font-medium mb-2">Разница за период (общая)</p>
+                  <p className={`text-3xl font-bold ${coefficients.totalTimeDiff >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {coefficients.totalTimeDiff >= 0 ? '+' : ''}{formatTime(Math.abs(coefficients.totalTimeDiff))}
+                  </p>
                 </div>
-                <TrendingUp className="h-8 w-8 text-teal-200" />
+                <TrendingUp className="h-8 w-8 text-gray-400" />
               </div>
             </div>
           </div>

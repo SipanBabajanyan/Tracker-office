@@ -437,16 +437,21 @@ function formatTime(minutes) {
         const avgCoefficient = targetMinutes > 0 ? (row.avg_minutes / targetMinutes * 100) : 0;
         const totalCoefficient = targetMinutes > 0 ? (row.total_minutes / (targetMinutes * row.days_count) * 100) : 0;
         
+        // Рассчитываем общее целевое время для периода
+        const totalTargetMinutes = targetMinutes * row.days_count;
+        const totalTimeDiff = Math.round(row.total_minutes - totalTargetMinutes);
+        
         res.json({
             targetHours: row.target_hours_per_day,
             targetMinutes: targetMinutes,
+            totalTargetMinutes: totalTargetMinutes, // Общее целевое время за период
             avgMinutes: Math.round(row.avg_minutes),
             totalMinutes: Math.round(row.total_minutes),
             daysCount: row.days_count,
             avgCoefficient: Math.round(avgCoefficient),
             totalCoefficient: Math.round(totalCoefficient),
             avgTimeDiff: Math.round(row.avg_minutes - targetMinutes),
-            totalTimeDiff: Math.round(row.total_minutes - (targetMinutes * row.days_count))
+            totalTimeDiff: totalTimeDiff // Разница времени за весь период
         });
     });
 });
