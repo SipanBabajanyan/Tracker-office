@@ -23,7 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _initializeApp();
     
     // Обновляем UI каждые 5 секунд
     _updateTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
@@ -31,6 +31,15 @@ class _HomeScreenState extends State<HomeScreen> {
         _loadData();
       }
     });
+  }
+
+  /// Инициализирует приложение
+  Future<void> _initializeApp() async {
+    // Автоматически запускаем отслеживание при старте
+    if (!TrackingService.isTracking) {
+      await TrackingService.startTracking();
+    }
+    await _loadData();
   }
 
   @override
@@ -54,32 +63,34 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// Переключает отслеживание
-  Future<void> _toggleTracking() async {
+  /// Проверяет статус подключения (ручная проверка)
+  Future<void> _checkConnection() async {
     try {
-      if (_isTracking) {
-        print('Останавливаем отслеживание...');
-        await TrackingService.stopTracking();
-      } else {
-        print('Запускаем отслеживание...');
-        // Проверяем разрешения на местоположение (нужны для получения SSID)
-        final hasPermissions = await WifiService.hasPermissions();
-        if (!hasPermissions) {
-          final granted = await WifiService.requestPermissions();
-          if (!granted) {
-            _showSnackBar('Необходимы разрешения на местоположение для определения WiFi сети');
-            return;
-          }
+      print('Ручная проверка статуса...');
+      
+      // Проверяем разрешения на местоположение (нужны для получения SSID)
+      final hasPermissions = await WifiService.hasPermissions();
+      if (!hasPermissions) {
+        final granted = await WifiService.requestPermissions();
+        if (!granted) {
+          _showSnackBar('Необходимы разрешения на местоположение для определения WiFi сети');
+          return;
         }
-        
+      }
+      
+      // Запускаем отслеживание (если еще не запущено)
+      if (!_isTracking) {
         await TrackingService.startTracking();
       }
       
-      // Принудительно обновляем данные
+      // Принудительно проверяем статус
+      await TrackingService.forceCheck();
+      
+      // Обновляем данные
       await _loadData();
-      print('Данные обновлены после переключения');
+      print('Статус проверен и обновлен');
     } catch (e) {
-      print('Ошибка при переключении: $e');
+      print('Ошибка при проверке: $e');
       _showSnackBar('Ошибка: $e');
     }
   }
@@ -107,12 +118,6 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.black87),
-            onPressed: _loadData,
-          ),
-        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -137,18 +142,18 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 20),
                         
-                        // Большая круглая кнопка ON/OFF
+                        // Большая круглая кнопка CHECK
                         GestureDetector(
-                          onTap: _toggleTracking,
+                          onTap: _checkConnection,
                           child: Container(
                             width: 200,
                             height: 200,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: _isTracking ? Colors.green[500] : Colors.red[500],
+                              color: Colors.blue[500],
                               boxShadow: [
                                 BoxShadow(
-                                  color: (_isTracking ? Colors.green : Colors.red).withOpacity(0.3),
+                                  color: Colors.blue.withOpacity(0.3),
                                   blurRadius: 20,
                                   spreadRadius: 5,
                                 ),
@@ -156,12 +161,12 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             child: Center(
                               child: Text(
-                                _isTracking ? 'ON' : 'OFF',
+                                'CHECK',
                                 style: const TextStyle(
-                                  fontSize: 36,
+                                  fontSize: 28,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
-                                  letterSpacing: 3,
+                                  letterSpacing: 2,
                                 ),
                               ),
                             ),

@@ -37,8 +37,8 @@ class TrackingService {
     // Сразу проверяем текущее состояние
     await _checkOfficeStatus();
     
-    // Запускаем периодическую проверку каждые 10 секунд
-    _checkTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+    // Запускаем периодическую проверку каждые 2 минуты
+    _checkTimer = Timer.periodic(const Duration(minutes: 2), (timer) {
       _checkOfficeStatus();
     });
     
@@ -142,6 +142,12 @@ class TrackingService {
       await db.updateSession(updatedSession);
       print('Принудительно завершена сессия: ${updatedSession.endTime}');
     }
+  }
+
+  /// Принудительно проверяет статус (для ручной проверки)
+  static Future<void> forceCheck() async {
+    print('Принудительная проверка статуса...');
+    await _checkOfficeStatus();
   }
 
   /// Получает текущий статус отслеживания
