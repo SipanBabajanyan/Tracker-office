@@ -26,7 +26,9 @@ class TrackingService {
 
   /// Начинает отслеживание
   static Future<void> startTracking() async {
-    if (_isTracking) return;
+    // Останавливаем предыдущий таймер, если есть
+    _checkTimer?.cancel();
+    _checkTimer = null;
 
     _isTracking = true;
     final prefs = await SharedPreferences.getInstance();
@@ -39,12 +41,15 @@ class TrackingService {
     _checkTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
       _checkOfficeStatus();
     });
+    
+    print('Отслеживание запущено, таймер активен');
   }
 
   /// Останавливает отслеживание
   static Future<void> stopTracking() async {
     if (!_isTracking) return;
 
+    print('Останавливаем отслеживание...');
     _isTracking = false;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_isTrackingKey, false);
@@ -52,6 +57,7 @@ class TrackingService {
     // Останавливаем таймер
     _checkTimer?.cancel();
     _checkTimer = null;
+    print('Таймер остановлен');
 
     // Завершаем активную сессию, если есть
     await _endActiveSession();
@@ -60,12 +66,16 @@ class TrackingService {
   /// Проверяет статус офиса
   static Future<void> _checkOfficeStatus() async {
     try {
+      print('Проверяем статус офиса...');
       final isInOffice = await WifiService.isConnectedToOffice();
       final prefs = await SharedPreferences.getInstance();
       final lastCheck = prefs.getString(_lastCheckKey);
       
+      print('Текущий статус: $isInOffice, предыдущий: $lastCheck');
+      
       // Если статус изменился
       if (lastCheck != isInOffice.toString()) {
+        print('Статус изменился! Новый статус: $isInOffice');
         if (isInOffice) {
           await _startOfficeSession();
         } else {
@@ -73,6 +83,8 @@ class TrackingService {
         }
         
         await prefs.setString(_lastCheckKey, isInOffice.toString());
+      } else {
+        print('Статус не изменился');
       }
     } catch (e) {
       print('Ошибка при проверке статуса офиса: $e');
