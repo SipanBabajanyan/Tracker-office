@@ -45,12 +45,12 @@ class _HomeScreenState extends State<HomeScreen> {
       if (_isTracking) {
         await TrackingService.stopTracking();
       } else {
-        // Проверяем разрешения
+        // Проверяем разрешения на местоположение (нужны для получения SSID)
         final hasPermissions = await WifiService.hasPermissions();
         if (!hasPermissions) {
           final granted = await WifiService.requestPermissions();
           if (!granted) {
-            _showSnackBar('Необходимы разрешения для работы приложения');
+            _showSnackBar('Необходимы разрешения на местоположение для определения WiFi сети');
             return;
           }
         }
