@@ -1,5 +1,4 @@
 import 'package:network_info_plus/network_info_plus.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 /// Сервис для работы с Wi-Fi
 class WifiService {
@@ -9,13 +8,6 @@ class WifiService {
   /// Проверяет, подключен ли к Wi-Fi офиса
   static Future<bool> isConnectedToOffice() async {
     try {
-      // Запрашиваем разрешение на доступ к Wi-Fi
-      final status = await Permission.locationWhenInUse.request();
-      if (status != PermissionStatus.granted) {
-        print('Нет разрешения на доступ к местоположению');
-        return false;
-      }
-
       // Получаем информацию о текущем Wi-Fi
       final networkInfo = NetworkInfo();
       final wifiInfo = await networkInfo.getWifiName();
@@ -42,11 +34,6 @@ class WifiService {
   /// Получает текущий SSID
   static Future<String?> getCurrentSSID() async {
     try {
-      final status = await Permission.locationWhenInUse.request();
-      if (status != PermissionStatus.granted) {
-        return null;
-      }
-
       final networkInfo = NetworkInfo();
       final wifiInfo = await networkInfo.getWifiName();
       return wifiInfo?.replaceAll('"', '');
@@ -56,16 +43,14 @@ class WifiService {
     }
   }
 
-  /// Проверяет, есть ли разрешения
+  /// Проверяет, есть ли разрешения (теперь не нужны для WiFi)
   static Future<bool> hasPermissions() async {
-    final status = await Permission.locationWhenInUse.status;
-    return status == PermissionStatus.granted;
+    return true; // WiFi не требует специальных разрешений
   }
 
-  /// Запрашивает необходимые разрешения
+  /// Запрашивает необходимые разрешения (теперь не нужны)
   static Future<bool> requestPermissions() async {
-    final status = await Permission.locationWhenInUse.request();
-    return status == PermissionStatus.granted;
+    return true; // WiFi не требует специальных разрешений
   }
 
   /// Получает список офисных Wi-Fi сетей

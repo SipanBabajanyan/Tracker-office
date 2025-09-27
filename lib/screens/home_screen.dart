@@ -81,220 +81,132 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
         title: const Text('Office Tracker'),
-        backgroundColor: Colors.blue[600],
-        foregroundColor: Colors.white,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
+        elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh, color: Colors.black87),
             onPressed: _loadData,
           ),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Статус отслеживания
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Отслеживание',
-                                style: Theme.of(context).textTheme.titleLarge,
-                              ),
-                              Switch(
-                                value: _isTracking,
-                                onChanged: (_) => _toggleTracking(),
-                              ),
-                            ],
+          : Column(
+              children: [
+                // Большой статус по центру
+                Expanded(
+                  flex: 2,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Статус В ОФИСЕ / ВНЕ ОФИСА
+                        Text(
+                          _currentSession?.isActive == true ? 'В ОФИСЕ' : 'ВНЕ ОФИСА',
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: _currentSession?.isActive == true ? Colors.green[700] : Colors.red[700],
+                            letterSpacing: 2,
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _isTracking ? 'Включено' : 'Выключено',
-                            style: TextStyle(
-                              color: _isTracking ? Colors.green : Colors.red,
-                              fontWeight: FontWeight.bold,
+                        ),
+                        const SizedBox(height: 20),
+                        
+                        // Большая круглая кнопка ON/OFF
+                        GestureDetector(
+                          onTap: _toggleTracking,
+                          child: Container(
+                            width: 200,
+                            height: 200,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _isTracking ? Colors.green[500] : Colors.red[500],
+                              boxShadow: [
+                                BoxShadow(
+                                  color: (_isTracking ? Colors.green : Colors.red).withOpacity(0.3),
+                                  blurRadius: 20,
+                                  spreadRadius: 5,
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Текущий статус
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Текущий статус',
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                _currentSession?.isActive == true
-                                    ? Icons.location_on
-                                    : Icons.location_off,
-                                color: _currentSession?.isActive == true
-                                    ? Colors.green
-                                    : Colors.red,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                _currentSession?.isActive == true
-                                    ? 'В офисе'
-                                    : 'Вне офиса',
-                                style: TextStyle(
-                                  fontSize: 18,
+                            child: Center(
+                              child: Text(
+                                _isTracking ? 'ON' : 'OFF',
+                                style: const TextStyle(
+                                  fontSize: 36,
                                   fontWeight: FontWeight.bold,
-                                  color: _currentSession?.isActive == true
-                                      ? Colors.green
-                                      : Colors.red,
+                                  color: Colors.white,
+                                  letterSpacing: 3,
                                 ),
                               ),
-                            ],
-                          ),
-                          if (_currentSession?.isActive == true) ...[
-                            const SizedBox(height: 8),
-                            Text(
-                              'Начало: ${DateFormat('HH:mm').format(_currentSession!.startTime)}',
-                              style: Theme.of(context).textTheme.bodyMedium,
                             ),
-                            Text(
-                              'Время в офисе: ${_formatDuration(_currentSession!.activeDuration)}',
-                              style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                // Время в офисе внизу
+                Expanded(
+                  flex: 1,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(30),
+                        topRight: Radius.circular(30),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, -5),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Время в офисе сегодня',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          _formatDuration(_todayStats['totalTime'] ?? Duration.zero),
+                          style: TextStyle(
+                            fontSize: 48,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue[700],
+                          ),
+                        ),
+                        if (_currentSession?.isActive == true) ...[
+                          const SizedBox(height: 10),
+                          Text(
+                            'Начало: ${DateFormat('HH:mm').format(_currentSession!.startTime)}',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.grey[600],
                             ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Статистика за день
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Сегодня (${DateFormat('dd.MM.yyyy').format(DateTime.now())})',
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            children: [
-                              Column(
-                                children: [
-                                  Text(
-                                    _formatDuration(_todayStats['totalTime'] ?? Duration.zero),
-                                    style: const TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.blue,
-                                    ),
-                                  ),
-                                  const Text('Общее время'),
-                                ],
-                              ),
-                              Column(
-                                children: [
-                                  Text(
-                                    '${_todayStats['sessionCount'] ?? 0}',
-                                    style: const TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.green,
-                                    ),
-                                  ),
-                                  const Text('Сессий'),
-                                ],
-                              ),
-                            ],
                           ),
                         ],
-                      ),
+                      ],
                     ),
                   ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Информация о Wi-Fi
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Информация о Wi-Fi',
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 8),
-                          FutureBuilder<String?>(
-                            future: WifiService.getCurrentSSID(),
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState == ConnectionState.waiting) {
-                                return const Text('Загрузка...');
-                              }
-                              
-                              final ssid = snapshot.data;
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Текущий Wi-Fi: ${ssid ?? 'Не подключен'}'),
-                                  Text('Офисные Wi-Fi: ${WifiService.getOfficeSSIDs().join(', ')}'),
-                                  const SizedBox(height: 8),
-                                  Builder(
-                                    builder: (context) {
-                                      final isInOffice = ssid != null && WifiService.getOfficeSSIDs().contains(ssid);
-                                      return Row(
-                                        children: [
-                                          Icon(
-                                            isInOffice ? Icons.check_circle : Icons.cancel,
-                                            color: isInOffice ? Colors.green : Colors.red,
-                                            size: 16,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            isInOffice ? 'Подключен к офису' : 'Не в офисе',
-                                            style: TextStyle(
-                                              color: isInOffice ? Colors.green : Colors.red,
-                                            ),
-                                          ),
-                                        ],
-                                      );
-                                    },
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
     );
   }
