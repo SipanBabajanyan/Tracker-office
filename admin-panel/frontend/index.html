@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>In Office - Админ панель</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #7f8c8d;
+            font-size: 1.2em;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-number {
+            font-size: 3em;
+            font-weight: bold;
+            color: #3498db;
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 1.1em;
+        }
+
+        .employees-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 1.8em;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .employee-list {
+            display: grid;
+            gap: 15px;
+        }
+
+        .employee-item {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 5px solid #3498db;
+        }
+
+        .employee-info h3 {
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .employee-info p {
+            color: #7f8c8d;
+        }
+
+        .employee-status {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .status-in-office {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-out-office {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .time-info {
+            text-align: right;
+        }
+
+        .time-info .total-time {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .time-info .last-seen {
+            font-size: 0.9em;
+            color: #7f8c8d;
+        }
+
+        .export-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .export-btn {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+            margin: 10px;
+        }
+
+        .export-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .refresh-btn {
+            background: linear-gradient(135deg, #27ae60, #2ecc71);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 20px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+            margin-left: 20px;
+        }
+
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .employee-item {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .time-info {
+                text-align: center;
+                margin-top: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏢 In Office - Админ панель</h1>
+            <p>Отслеживание присутствия сотрудников в офисе</p>
+            <button class="refresh-btn" onclick="refreshData()">🔄 Обновить данные</button>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number" id="totalEmployees">-</div>
+                <div class="stat-label">Всего сотрудников</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="inOfficeNow">-</div>
+                <div class="stat-label">В офисе сейчас</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="avgTimeToday">-</div>
+                <div class="stat-label">Среднее время сегодня (ч)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalTimeToday">-</div>
+                <div class="stat-label">Общее время сегодня (ч)</div>
+            </div>
+        </div>
+
+        <div class="employees-section">
+            <h2 class="section-title">👥 Сотрудники</h2>
+            <div id="employeesList" class="employee-list">
+                <div class="loading">Загрузка данных...</div>
+            </div>
+        </div>
+
+        <div class="export-section">
+            <h2 class="section-title">📊 Экспорт данных</h2>
+            <button class="export-btn" onclick="exportToExcel()">📈 Экспорт в Excel</button>
+            <button class="export-btn" onclick="exportToCSV()">📄 Экспорт в CSV</button>
+            <button class="export-btn" onclick="exportReport()">📋 Отчет за период</button>
+        </div>
+    </div>
+
+    <script>
+        // Данные для демонстрации (в реальном приложении будут загружаться с сервера)
+        let employeesData = [];
+
+        // Инициализация
+        document.addEventListener('DOMContentLoaded', function() {
+            loadData();
+        });
+
+        // Загрузка данных
+        async function loadData() {
+            try {
+                // В реальном приложении здесь будет запрос к API
+                // const response = await fetch('/api/employees');
+                // employeesData = await response.json();
+                
+                // Демо данные
+                employeesData = [
+                    {
+                        id: 1,
+                        name: "Иван Петров",
+                        deviceId: "device_001",
+                        isInOffice: true,
+                        totalTimeToday: "7:30",
+                        lastSeen: "2 минуты назад",
+                        startTime: "09:00"
+                    },
+                    {
+                        id: 2,
+                        name: "Мария Сидорова",
+                        deviceId: "device_002",
+                        isInOffice: false,
+                        totalTimeToday: "6:15",
+                        lastSeen: "15 минут назад",
+                        startTime: null
+                    },
+                    {
+                        id: 3,
+                        name: "Алексей Козлов",
+                        deviceId: "device_003",
+                        isInOffice: true,
+                        totalTimeToday: "8:45",
+                        lastSeen: "1 минуту назад",
+                        startTime: "08:30"
+                    }
+                ];
+
+                updateStats();
+                updateEmployeesList();
+            } catch (error) {
+                console.error('Ошибка загрузки данных:', error);
+                document.getElementById('employeesList').innerHTML = 
+                    '<div class="loading">Ошибка загрузки данных</div>';
+            }
+        }
+
+        // Обновление статистики
+        function updateStats() {
+            const totalEmployees = employeesData.length;
+            const inOfficeNow = employeesData.filter(emp => emp.isInOffice).length;
+            
+            // Подсчет среднего времени
+            const totalMinutes = employeesData.reduce((sum, emp) => {
+                const [hours, minutes] = emp.totalTimeToday.split(':').map(Number);
+                return sum + hours * 60 + minutes;
+            }, 0);
+            const avgMinutes = totalMinutes / totalEmployees;
+            const avgHours = (avgMinutes / 60).toFixed(1);
+            
+            const totalHours = (totalMinutes / 60).toFixed(1);
+
+            document.getElementById('totalEmployees').textContent = totalEmployees;
+            document.getElementById('inOfficeNow').textContent = inOfficeNow;
+            document.getElementById('avgTimeToday').textContent = avgHours;
+            document.getElementById('totalTimeToday').textContent = totalHours;
+        }
+
+        // Обновление списка сотрудников
+        function updateEmployeesList() {
+            const container = document.getElementById('employeesList');
+            
+            if (employeesData.length === 0) {
+                container.innerHTML = '<div class="loading">Нет данных о сотрудниках</div>';
+                return;
+            }
+
+            container.innerHTML = employeesData.map(employee => `
+                <div class="employee-item">
+                    <div class="employee-info">
+                        <h3>${employee.name}</h3>
+                        <p>ID устройства: ${employee.deviceId}</p>
+                        ${employee.startTime ? `<p>Начало работы: ${employee.startTime}</p>` : ''}
+                    </div>
+                    <div class="time-info">
+                        <div class="total-time">${employee.totalTimeToday}</div>
+                        <div class="last-seen">${employee.lastSeen}</div>
+                        <div class="employee-status ${employee.isInOffice ? 'status-in-office' : 'status-out-office'}">
+                            ${employee.isInOffice ? 'В ОФИСЕ' : 'ВНЕ ОФИСА'}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Обновление данных
+        function refreshData() {
+            document.getElementById('employeesList').innerHTML = 
+                '<div class="loading">Обновление данных...</div>';
+            loadData();
+        }
+
+        // Экспорт в Excel
+        function exportToExcel() {
+            alert('Функция экспорта в Excel будет реализована');
+        }
+
+        // Экспорт в CSV
+        function exportToCSV() {
+            alert('Функция экспорта в CSV будет реализована');
+        }
+
+        // Экспорт отчета
+        function exportReport() {
+            alert('Функция экспорта отчета будет реализована');
+        }
+    </script>
+</body>
+</html>
