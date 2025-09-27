@@ -73,19 +73,17 @@ class TrackingService {
       
       print('Текущий статус: $isInOffice, предыдущий: $lastCheck');
       
-      // Если статус изменился
-      if (lastCheck != isInOffice.toString()) {
-        print('Статус изменился! Новый статус: $isInOffice');
-        if (isInOffice) {
-          await _startOfficeSession();
-        } else {
-          await _endOfficeSession();
-        }
-        
-        await prefs.setString(_lastCheckKey, isInOffice.toString());
+      // Всегда обновляем статус при проверке
+      if (isInOffice) {
+        await _startOfficeSession();
       } else {
-        print('Статус не изменился');
+        await _endOfficeSession();
       }
+      
+      // Сохраняем текущий статус
+      await prefs.setString(_lastCheckKey, isInOffice.toString());
+      print('Статус обновлен: $isInOffice');
+      
     } catch (e) {
       print('Ошибка при проверке статуса офиса: $e');
     }
@@ -97,7 +95,10 @@ class TrackingService {
     
     // Проверяем, есть ли уже активная сессия
     final activeSession = await db.getActiveSession();
-    if (activeSession != null) return;
+    if (activeSession != null) {
+      print('Сессия уже активна, не создаем новую');
+      return;
+    }
 
     // Создаем новую сессию
     final session = OfficeSession(
@@ -122,6 +123,8 @@ class TrackingService {
       
       await db.updateSession(updatedSession);
       print('Завершена сессия в офисе: ${updatedSession.endTime}');
+    } else {
+      print('Нет активной сессии для завершения');
     }
   }
 

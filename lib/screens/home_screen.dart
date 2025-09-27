@@ -58,8 +58,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _toggleTracking() async {
     try {
       if (_isTracking) {
+        print('Останавливаем отслеживание...');
         await TrackingService.stopTracking();
       } else {
+        print('Запускаем отслеживание...');
         // Проверяем разрешения на местоположение (нужны для получения SSID)
         final hasPermissions = await WifiService.hasPermissions();
         if (!hasPermissions) {
@@ -73,8 +75,11 @@ class _HomeScreenState extends State<HomeScreen> {
         await TrackingService.startTracking();
       }
       
+      // Принудительно обновляем данные
       await _loadData();
+      print('Данные обновлены после переключения');
     } catch (e) {
+      print('Ошибка при переключении: $e');
       _showSnackBar('Ошибка: $e');
     }
   }
