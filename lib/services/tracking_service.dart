@@ -11,6 +11,7 @@ class TrackingService {
   static const String _lastCheckKey = 'last_check';
   
   static bool _isTracking = false;
+  static Timer? _checkTimer;
 
   /// Инициализирует сервис отслеживания
   static Future<void> initialize() async {
@@ -33,6 +34,11 @@ class TrackingService {
 
     // Сразу проверяем текущее состояние
     await _checkOfficeStatus();
+    
+    // Запускаем периодическую проверку каждые 10 секунд
+    _checkTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      _checkOfficeStatus();
+    });
   }
 
   /// Останавливает отслеживание
@@ -42,6 +48,10 @@ class TrackingService {
     _isTracking = false;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_isTrackingKey, false);
+
+    // Останавливаем таймер
+    _checkTimer?.cancel();
+    _checkTimer = null;
 
     // Завершаем активную сессию, если есть
     await _endActiveSession();

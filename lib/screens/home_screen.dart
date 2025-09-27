@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/tracking_service.dart';
@@ -17,11 +18,25 @@ class _HomeScreenState extends State<HomeScreen> {
   OfficeSession? _currentSession;
   Map<String, dynamic> _todayStats = {};
   bool _isLoading = true;
+  Timer? _updateTimer;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    
+    // Обновляем UI каждые 5 секунд
+    _updateTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (mounted) {
+        _loadData();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _updateTimer?.cancel();
+    super.dispose();
   }
 
   /// Загружает данные
