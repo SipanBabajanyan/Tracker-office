@@ -331,7 +331,7 @@ export default function EmployeeDetail() {
                 { key: 'quarter', label: 'Квартал' },
                 { key: '6months', label: '6 месяцев' },
                 { key: 'year', label: 'Год' },
-                { key: 'alltime', label: 'All time' }
+                { key: 'alltime', label: 'Все время' }
               ].map((period) => (
                 <button
                   key={period.key}
