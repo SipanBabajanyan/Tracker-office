@@ -9,10 +9,10 @@ class WifiService {
   /// Проверяет, подключен ли к Wi-Fi офиса
   static Future<bool> isConnectedToOffice() async {
     try {
-      // Проверяем разрешения на местоположение (нужны для получения SSID на Android)
-      final locationStatus = await Permission.locationWhenInUse.status;
-      if (locationStatus != PermissionStatus.granted) {
-        print('Нет разрешения на местоположение для получения SSID');
+      // Запрашиваем разрешение на доступ к Wi-Fi
+      final status = await Permission.locationWhenInUse.request();
+      if (status != PermissionStatus.granted) {
+        print('Нет разрешения на доступ к местоположению');
         return false;
       }
 
@@ -42,8 +42,8 @@ class WifiService {
   /// Получает текущий SSID
   static Future<String?> getCurrentSSID() async {
     try {
-      final locationStatus = await Permission.locationWhenInUse.status;
-      if (locationStatus != PermissionStatus.granted) {
+      final status = await Permission.locationWhenInUse.request();
+      if (status != PermissionStatus.granted) {
         return null;
       }
 
