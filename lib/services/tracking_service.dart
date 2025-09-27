@@ -1,0 +1,146 @@
+import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'database_service.dart';
+import 'wifi_service.dart';
+import '../models/office_session.dart';
+
+/// Сервис для отслеживания времени в офисе
+class TrackingService {
+  static const String _taskName = 'officeTrackingTask';
+  static const String _isTrackingKey = 'is_tracking';
+  static const String _lastCheckKey = 'last_check';
+  
+  static bool _isTracking = false;
+
+  /// Инициализирует сервис отслеживания
+  static Future<void> initialize() async {
+    // Загружаем состояние отслеживания
+    final prefs = await SharedPreferences.getInstance();
+    _isTracking = prefs.getBool(_isTrackingKey) ?? false;
+
+    if (_isTracking) {
+      await startTracking();
+    }
+  }
+
+  /// Начинает отслеживание
+  static Future<void> startTracking() async {
+    if (_isTracking) return;
+
+    _isTracking = true;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_isTrackingKey, true);
+
+    // Сразу проверяем текущее состояние
+    await _checkOfficeStatus();
+  }
+
+  /// Останавливает отслеживание
+  static Future<void> stopTracking() async {
+    if (!_isTracking) return;
+
+    _isTracking = false;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_isTrackingKey, false);
+
+    // Завершаем активную сессию, если есть
+    await _endActiveSession();
+  }
+
+  /// Проверяет статус офиса
+  static Future<void> _checkOfficeStatus() async {
+    try {
+      final isInOffice = await WifiService.isConnectedToOffice();
+      final prefs = await SharedPreferences.getInstance();
+      final lastCheck = prefs.getString(_lastCheckKey);
+      
+      // Если статус изменился
+      if (lastCheck != isInOffice.toString()) {
+        if (isInOffice) {
+          await _startOfficeSession();
+        } else {
+          await _endOfficeSession();
+        }
+        
+        await prefs.setString(_lastCheckKey, isInOffice.toString());
+      }
+    } catch (e) {
+      print('Ошибка при проверке статуса офиса: $e');
+    }
+  }
+
+  /// Начинает сессию в офисе
+  static Future<void> _startOfficeSession() async {
+    final db = DatabaseService();
+    
+    // Проверяем, есть ли уже активная сессия
+    final activeSession = await db.getActiveSession();
+    if (activeSession != null) return;
+
+    // Создаем новую сессию
+    final session = OfficeSession(
+      startTime: DateTime.now(),
+      isActive: true,
+    );
+
+    await db.insertSession(session);
+    print('Начата сессия в офисе: ${session.startTime}');
+  }
+
+  /// Завершает сессию в офисе
+  static Future<void> _endOfficeSession() async {
+    final db = DatabaseService();
+    final activeSession = await db.getActiveSession();
+    
+    if (activeSession != null) {
+      final updatedSession = activeSession.copyWith(
+        endTime: DateTime.now(),
+        isActive: false,
+      );
+      
+      await db.updateSession(updatedSession);
+      print('Завершена сессия в офисе: ${updatedSession.endTime}');
+    }
+  }
+
+  /// Завершает активную сессию (при остановке отслеживания)
+  static Future<void> _endActiveSession() async {
+    final db = DatabaseService();
+    final activeSession = await db.getActiveSession();
+    
+    if (activeSession != null) {
+      final updatedSession = activeSession.copyWith(
+        endTime: DateTime.now(),
+        isActive: false,
+      );
+      
+      await db.updateSession(updatedSession);
+      print('Принудительно завершена сессия: ${updatedSession.endTime}');
+    }
+  }
+
+  /// Получает текущий статус отслеживания
+  static bool get isTracking => _isTracking;
+
+  /// Получает информацию о текущей сессии
+  static Future<OfficeSession?> getCurrentSession() async {
+    final db = DatabaseService();
+    return await db.getActiveSession();
+  }
+
+  /// Получает статистику за день
+  static Future<Map<String, dynamic>> getTodayStats() async {
+    final db = DatabaseService();
+    final today = DateTime.now();
+    final sessions = await db.getSessionsForDay(today);
+    final totalTime = await db.getTotalTimeForDay(today);
+    
+    return {
+      'sessions': sessions,
+      'totalTime': totalTime,
+      'sessionCount': sessions.length,
+      'isCurrentlyInOffice': sessions.isNotEmpty && sessions.last.isActive,
+    };
+  }
+}
+
