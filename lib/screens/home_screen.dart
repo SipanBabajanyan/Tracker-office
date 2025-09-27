@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/tracking_service.dart';
 import '../services/wifi_service.dart';
-import '../services/background_service.dart';
+import '../services/timer_background_service.dart';
 import '../models/office_session.dart';
 
 /// Главный экран приложения
@@ -37,20 +37,19 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Инициализирует приложение
   Future<void> _initializeApp() async {
     try {
-      // Инициализируем фоновый сервис
-      await BackgroundService.initialize();
-      
-      // Запускаем фоновый сервис
-      await BackgroundService.start();
+      // Запускаем таймер фоновый сервис
+      await TimerBackgroundService.start();
       
       // Автоматически запускаем отслеживание при старте
       if (!TrackingService.isTracking) {
         await TrackingService.startTracking();
       }
       await _loadData();
+      
+      print('Приложение инициализировано успешно с таймер фоновым сервисом');
     } catch (e) {
       print('Ошибка при инициализации: $e');
-      // Продолжаем работу даже если фоновый сервис не запустился
+      // Продолжаем работу даже если что-то не работает
       if (!TrackingService.isTracking) {
         await TrackingService.startTracking();
       }
