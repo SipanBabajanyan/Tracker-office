@@ -65,8 +65,14 @@ export default function EmployeeDetail() {
     }
   }, [isAuthenticated, authLoading, employeeId, router]);
 
-  const loadEmployeeData = async () => {
+  const loadEmployeeData = async (period?: string) => {
+    const targetPeriod = period || currentPeriod;
+    
     try {
+      setLoading(true);
+      
+      console.log(`🔄 Начинаем загрузку данных для периода: ${targetPeriod}`);
+      
       // Загружаем данные сотрудника
       const employeeResponse = await fetch(`http://localhost:3000/api/employees`);
       const employees = await employeeResponse.json();
@@ -77,18 +83,25 @@ export default function EmployeeDetail() {
         setNewName(currentEmployee.name);
       }
 
-      // Загружаем историю
-      const historyResponse = await fetch(`http://localhost:3000/api/employee/${employeeId}/history?period=${currentPeriod}`);
-      const historyData = await historyResponse.json();
-      setHistory(historyData);
+      // Загружаем историю и коэффициенты параллельно
+      const [historyResponse, coefficientsResponse] = await Promise.all([
+        fetch(`http://localhost:3000/api/employee/${employeeId}/history?period=${targetPeriod}`),
+        fetch(`http://localhost:3000/api/employee/${employeeId}/coefficients?period=${targetPeriod}`)
+      ]);
 
-      // Загружаем коэффициенты
-      const coefficientsResponse = await fetch(`http://localhost:3000/api/employee/${employeeId}/coefficients?period=${currentPeriod}`);
+      const historyData = await historyResponse.json();
       const coefficientsData = await coefficientsResponse.json();
+      
+      setHistory(historyData);
       setCoefficients(coefficientsData);
       setNewTargetHours(coefficientsData.targetHours);
+      
+      console.log(`✅ Данные загружены для периода: ${targetPeriod}`, { 
+        historyCount: historyData.length, 
+        coefficients: coefficientsData 
+      });
     } catch (error) {
-      console.error('Ошибка загрузки данных сотрудника:', error);
+      console.error('❌ Ошибка загрузки данных сотрудника:', error);
     } finally {
       setLoading(false);
     }
@@ -172,6 +185,16 @@ export default function EmployeeDetail() {
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
+  };
+
+  // Простая функция смены периода
+  const handlePeriodChange = (period: string) => {
+    if (currentPeriod === period) return;
+    
+    console.log(`🔄 Смена периода с ${currentPeriod} на ${period}`);
+    setCurrentPeriod(period);
+    setCurrentPage(1);
+    loadEmployeeData(period);
   };
 
   if (loading || authLoading) {
@@ -311,10 +334,7 @@ export default function EmployeeDetail() {
               ].map((period) => (
                 <button
                   key={period.key}
-                  onClick={() => {
-                    setCurrentPeriod(period.key);
-                    loadEmployeeData();
-                  }}
+                  onClick={() => handlePeriodChange(period.key)}
                   className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 text-sm ${
                     currentPeriod === period.key
                       ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg transform scale-105'
