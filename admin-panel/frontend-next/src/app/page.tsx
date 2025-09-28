@@ -14,6 +14,12 @@ interface Employee {
   lastSeen: string;
   targetHours?: number;
   coefficient?: number;
+  analytics?: {
+    coefficient: number;
+    avgTimeDiff: number;
+    totalTimeDiff: number;
+    totalTargetMinutes: number;
+  };
 }
 
 export default function Dashboard() {
@@ -32,13 +38,55 @@ export default function Dashboard() {
     if (isAuthenticated) {
       loadEmployees();
     }
-  }, [isAuthenticated, authLoading, router]);
+  }, [isAuthenticated, authLoading, router, currentPeriod]);
+
+  const formatTime = (minutes: number) => {
+    if (isNaN(minutes) || minutes === undefined || minutes === null) {
+      return '0ч 0м';
+    }
+    const hours = Math.floor(Math.abs(minutes) / 60);
+    const mins = Math.abs(minutes) % 60;
+    const sign = minutes < 0 ? '-' : '+';
+    return `${sign}${hours}:${mins.toString().padStart(2, '0')}`;
+  };
 
   const loadEmployees = async () => {
     try {
       const response = await fetch('http://localhost:3000/api/employees');
       const data = await response.json();
-      setEmployees(data);
+      
+      // Загружаем аналитические данные для каждого сотрудника
+      const employeesWithAnalytics = await Promise.all(
+        data.map(async (employee: any) => {
+          try {
+            const analyticsResponse = await fetch(`http://localhost:3000/api/employee/${employee.id}/coefficients?period=${currentPeriod}`);
+            const analytics = await analyticsResponse.json();
+            
+            return {
+              ...employee,
+              analytics: {
+                coefficient: analytics.avgCoefficient || 0,
+                avgTimeDiff: analytics.avgTimeDiff || 0,
+                totalTimeDiff: analytics.totalTimeDiff || 0,
+                totalTargetMinutes: analytics.totalTargetMinutes || 0
+              }
+            };
+          } catch (error) {
+            console.error(`Ошибка загрузки аналитики для сотрудника ${employee.id}:`, error);
+            return {
+              ...employee,
+              analytics: {
+                coefficient: 0,
+                avgTimeDiff: 0,
+                totalTimeDiff: 0,
+                totalTargetMinutes: 0
+              }
+            };
+          }
+        })
+      );
+      
+      setEmployees(employeesWithAnalytics);
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
       // Демо данные
@@ -49,7 +97,13 @@ export default function Dashboard() {
           deviceId: 'device_001',
           isInOffice: true,
           totalTimeToday: '7:30',
-          lastSeen: '2 минуты назад'
+          lastSeen: '2 минуты назад',
+          analytics: {
+            coefficient: 85,
+            avgTimeDiff: -30,
+            totalTimeDiff: -150,
+            totalTargetMinutes: 480
+          }
         },
         {
           id: 2,
@@ -57,7 +111,13 @@ export default function Dashboard() {
           deviceId: 'device_002',
           isInOffice: false,
           totalTimeToday: '6:15',
-          lastSeen: '15 минут назад'
+          lastSeen: '15 минут назад',
+          analytics: {
+            coefficient: 92,
+            avgTimeDiff: 15,
+            totalTimeDiff: 75,
+            totalTargetMinutes: 480
+          }
         }
       ]);
     } finally {
@@ -202,8 +262,7 @@ export default function Dashboard() {
         {/* Employees List */}
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden">
           <div className="px-8 py-6 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">👥 Сотрудники</h2>
-            <p className="text-gray-600">Нажмите на карточку для просмотра истории</p>
+            <h2 className="text-2xl font-bold text-gray-900">👥 Сотрудники</h2>
           </div>
           
           <div className="divide-y divide-gray-100">
@@ -211,37 +270,70 @@ export default function Dashboard() {
               <div 
                 key={employee.id} 
                 onClick={() => router.push(`/employee/${employee.id}`)}
-                className="p-8 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 cursor-pointer transition-all duration-300 group"
+                className="p-6 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 cursor-pointer transition-all duration-300 group"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <h3 className="text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors mb-2">
-                      {employee.name}
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-1">ID: <span className="font-mono bg-gray-100 px-2 py-1 rounded">{employee.deviceId}</span></p>
+                    <div className="flex items-center space-x-4 mb-3">
+                      <h3 className="text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+                        {employee.name}
+                      </h3>
+                      <div className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${
+                        employee.isInOffice
+                          ? 'bg-green-100 text-green-700 border border-green-200'
+                          : 'bg-red-100 text-red-700 border border-red-200'
+                      }`}>
+                        {employee.isInOffice ? 'В офисе' : 'Вне офиса'}
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-2">ID: <span className="font-mono bg-gray-100 px-2 py-1 rounded">{employee.deviceId}</span></p>
                     <p className="text-sm text-gray-500">Последняя активность: {employee.lastSeen}</p>
                   </div>
                   
-                  <div className="text-right">
-                    <div className="text-3xl font-bold bg-gradient-to-r from-green-500 to-green-600 bg-clip-text text-transparent mb-2">
-                      {employee.totalTimeToday}
-                    </div>
-                    {employee.coefficient !== undefined && (
-                      <div className={`text-lg font-bold mb-2 ${
-                        employee.coefficient >= 100 ? 'text-green-600' : 
-                        employee.coefficient >= 80 ? 'text-yellow-600' : 'text-red-600'
-                      }`}>
-                        {employee.coefficient}%
+                  {/* Analytics Cards */}
+                  {employee.analytics && (
+                    <div className="grid grid-cols-4 gap-3">
+                      {/* Коэффициент */}
+                      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 text-center">
+                        <p className="text-xs text-gray-500 mb-1">Коэффициент</p>
+                        <p className={`text-lg font-bold ${
+                          employee.analytics.coefficient >= 120 ? 'text-green-800' :
+                          employee.analytics.coefficient >= 100 ? 'text-green-600' : 
+                          employee.analytics.coefficient >= 90 ? 'text-orange-600' : 'text-red-600'
+                        }`}>
+                          {employee.analytics.coefficient}%
+                        </p>
                       </div>
-                    )}
-                    <div className={`inline-flex px-4 py-2 rounded-full text-sm font-bold ${
-                      employee.isInOffice
-                        ? 'bg-gradient-to-r from-green-100 to-green-200 text-green-800 border border-green-300'
-                        : 'bg-gradient-to-r from-red-100 to-red-200 text-red-800 border border-red-300'
-                    }`}>
-                      {employee.isInOffice ? 'В ОФИСЕ' : 'ВНЕ ОФИСА'}
+
+                      {/* Разница времени (в среднем) */}
+                      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 text-center">
+                        <p className="text-xs text-gray-500 mb-1">Разница (средняя)</p>
+                        <p className={`text-lg font-bold ${
+                          employee.analytics.avgTimeDiff >= 0 ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {formatTime(employee.analytics.avgTimeDiff)}
+                        </p>
+                      </div>
+
+                      {/* Разница за период (общая) */}
+                      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 text-center">
+                        <p className="text-xs text-gray-500 mb-1">Разница (общая)</p>
+                        <p className={`text-lg font-bold ${
+                          employee.analytics.totalTimeDiff >= 0 ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {formatTime(employee.analytics.totalTimeDiff)}
+                        </p>
+                      </div>
+
+                      {/* Целевые часы */}
+                      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 text-center">
+                        <p className="text-xs text-gray-500 mb-1">Целевые часы</p>
+                        <p className="text-lg font-bold text-gray-900">
+                          {formatTime(employee.analytics.totalTargetMinutes)}
+                        </p>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             ))}
