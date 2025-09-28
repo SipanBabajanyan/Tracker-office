@@ -715,6 +715,75 @@ function calculateCoefficient(totalMinutes, targetHoursPerDay, dateStr) {
     });
 });
 
+// Получить сессии сотрудника
+app.get('/api/employee/:id/sessions', (req, res) => {
+    const employeeId = req.params.id;
+    const period = req.query.period || 'today';
+    
+    let dateFilter = '';
+    switch(period) {
+        case 'today':
+            dateFilter = 'AND DATE(created_at) = DATE("now")';
+            break;
+        case 'week':
+            dateFilter = 'AND DATE(created_at) >= DATE("now", "-7 days")';
+            break;
+        case 'month':
+            dateFilter = 'AND DATE(created_at) >= DATE("now", "-30 days")';
+            break;
+        case 'quarter':
+            dateFilter = 'AND DATE(created_at) >= DATE("now", "-90 days")';
+            break;
+        case '6months':
+            dateFilter = 'AND DATE(created_at) >= DATE("now", "-180 days")';
+            break;
+        case 'year':
+            dateFilter = 'AND DATE(created_at) >= DATE("now", "-365 days")';
+            break;
+        case 'alltime':
+            // Все время - без фильтра по дате
+            dateFilter = '';
+            break;
+    }
+
+    const query = `
+        SELECT 
+            id,
+            employee_id,
+            start_time,
+            end_time,
+            is_active,
+            created_at,
+            CASE 
+                WHEN end_time IS NOT NULL THEN 
+                    ROUND((julianday(end_time) - julianday(start_time)) * 24 * 60)
+                ELSE 0
+            END as total_minutes
+        FROM office_sessions 
+        WHERE employee_id = ? ${dateFilter}
+        ORDER BY created_at DESC
+    `;
+    
+    db.all(query, [employeeId], (err, rows) => {
+        if (err) {
+            console.error('Ошибка получения сессий:', err);
+            return res.status(500).json({ error: 'Ошибка базы данных' });
+        }
+        
+        const sessions = rows.map(row => ({
+            id: row.id,
+            employeeId: row.employee_id,
+            startTime: row.start_time,
+            endTime: row.end_time,
+            totalMinutes: row.total_minutes,
+            createdAt: row.created_at,
+            duration: formatTime(row.total_minutes)
+        }));
+
+        res.json(sessions);
+    });
+});
+
         // Получить коэффициенты сотрудника
         app.get('/api/employee/:id/coefficients', (req, res) => {
             const employeeId = req.params.id;
