@@ -223,6 +223,71 @@ app.put('/api/employees/:id', (req, res) => {
     });
 });
 
+// Функция для управления сессиями в office_sessions
+function manageOfficeSession(employeeId, isInOffice, totalMinutes) {
+    // Проверяем, есть ли активная сессия для сотрудника
+    const checkActiveSessionQuery = `
+        SELECT id, start_time FROM office_sessions 
+        WHERE employee_id = ? AND is_active = 1
+        ORDER BY created_at DESC LIMIT 1
+    `;
+    
+    db.get(checkActiveSessionQuery, [employeeId], (err, activeSession) => {
+        if (err) {
+            console.error('Ошибка проверки активной сессии:', err);
+            return;
+        }
+        
+        if (activeSession) {
+            // Есть активная сессия
+            if (isInOffice) {
+                // Сотрудник все еще в офисе - не создаем новую сессию
+                console.log(`Активная сессия уже существует для Employee ${employeeId}, не создаем новую`);
+            } else {
+                // Сотрудник ушел - закрываем активную сессию
+                const closeSessionQuery = `
+                    UPDATE office_sessions 
+                    SET end_time = datetime('now'), is_active = 0
+                    WHERE id = ?
+                `;
+                
+                db.run(closeSessionQuery, [activeSession.id], function(err) {
+                    if (err) {
+                        console.error('Ошибка закрытия сессии:', err);
+                    } else {
+                        console.log(`Сессия закрыта: Employee ${employeeId}, Session ID: ${activeSession.id}`);
+                    }
+                });
+            }
+        } else {
+            // Нет активной сессии
+            if (isInOffice && totalMinutes > 0) {
+                // Сотрудник в офисе - создаем новую сессию
+                const now = new Date();
+                const startTime = new Date(now.getTime() - totalMinutes * 60 * 1000);
+                
+                const createSessionQuery = `
+                    INSERT INTO office_sessions (employee_id, start_time, end_time, is_active)
+                    VALUES (?, ?, ?, ?)
+                `;
+                
+                db.run(createSessionQuery, [
+                    employeeId, 
+                    startTime.toISOString(), 
+                    null, // end_time = null для активной сессии
+                    1 // is_active = 1
+                ], function(err) {
+                    if (err) {
+                        console.error('Ошибка создания сессии:', err);
+                    } else {
+                        console.log(`Новая сессия создана: Employee ${employeeId}, Start: ${startTime.toISOString()}`);
+                    }
+                });
+            }
+        }
+    });
+}
+
 // Отправить сессию сотрудника (вызывается мобильным приложением)
 app.post('/api/employee/:id/session', async (req, res) => {
     const employeeId = req.params.id;
@@ -278,31 +343,8 @@ app.post('/api/employee/:id/session', async (req, res) => {
             }
         });
 
-        // Создаем запись в office_sessions для истории сессий
-        if (totalMinutes > 0) {
-            const sessionQuery = `
-                INSERT INTO office_sessions (employee_id, start_time, end_time, is_active)
-                VALUES (?, ?, ?, ?)
-            `;
-            
-            // Рассчитываем время начала и окончания на основе totalMinutes
-            const now = new Date();
-            const startTime = new Date(now.getTime() - totalMinutes * 60 * 1000);
-            const endTime = isInOffice ? null : now;
-            
-            db.run(sessionQuery, [
-                employeeId, 
-                startTime.toISOString(), 
-                endTime ? endTime.toISOString() : null, 
-                isInOffice ? 1 : 0
-            ], function(err) {
-                if (err) {
-                    console.error('Ошибка создания записи сессии:', err);
-                } else {
-                    console.log(`Запись сессии создана: Employee ${employeeId}, Start: ${startTime.toISOString()}, End: ${endTime ? endTime.toISOString() : 'null'}`);
-                }
-            });
-        }
+        // Управляем сессиями в office_sessions
+        manageOfficeSession(employeeId, isInOffice, totalMinutes);
 
         function updateEmployeeStatus() {
             // Обновляем статус сотрудника
