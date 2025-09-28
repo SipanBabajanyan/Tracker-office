@@ -52,14 +52,14 @@ export default function Dashboard() {
 
   const loadEmployees = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/employees');
+      const response = await fetch('http://192.168.15.20:3000/api/employees');
       const data = await response.json();
       
       // Загружаем аналитические данные для каждого сотрудника
       const employeesWithAnalytics = await Promise.all(
         data.map(async (employee: any) => {
           try {
-            const analyticsResponse = await fetch(`http://localhost:3000/api/employee/${employee.id}/coefficients?period=${currentPeriod}`);
+            const analyticsResponse = await fetch(`http://192.168.15.20:3000/api/employee/${employee.id}/coefficients?period=${currentPeriod}`);
             const analytics = await analyticsResponse.json();
             
             return {

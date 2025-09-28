@@ -6,7 +6,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 
 /// HTTP сервис для отправки данных на сервер
 class HttpService {
-  static const String _baseUrl = 'http://localhost:3000/api';
+  static const String _baseUrl = 'http://192.168.15.20:3000/api';
   static const String _deviceIdKey = 'device_id';
   static const String _employeeIdKey = 'employee_id';
   
