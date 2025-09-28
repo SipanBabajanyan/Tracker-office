@@ -516,12 +516,16 @@ export default function EmployeeDetail() {
                           <div key={index} className="px-8 py-4 hover:bg-gray-50 transition-colors">
                             <div className="grid grid-cols-5 gap-0 items-center">
                               {/* Дата */}
-                              <div>
-                                <div className="font-semibold text-gray-900">
+                              <div 
+                                className="cursor-pointer hover:bg-blue-50 p-2 rounded-lg transition-colors group"
+                                onClick={() => router.push(`/employee/${employeeId}/day/${day.date}`)}
+                                title="Нажмите для детальной истории дня"
+                              >
+                                <div className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
                                   {formatDate(day.date)}
                                 </div>
-                                <div className="text-sm text-gray-500">
-                                  {day.date}
+                                <div className="text-sm text-gray-500 group-hover:text-blue-500 transition-colors">
+                                  {day.date} • Нажмите для деталей
                                 </div>
                               </div>
                               

@@ -604,6 +604,86 @@ function calculateCoefficient(totalMinutes, targetHoursPerDay, dateStr) {
     });
 });
 
+// Получить детальную историю дня сотрудника
+app.get('/api/employee/:id/day/:date', (req, res) => {
+    const employeeId = req.params.id;
+    const date = req.params.date;
+    
+    // Получаем все сессии за день из office_sessions
+    const sessionsQuery = `
+        SELECT 
+            id,
+            start_time,
+            end_time,
+            is_active,
+            created_at
+        FROM office_sessions 
+        WHERE employee_id = ? 
+        AND DATE(start_time) = ?
+        ORDER BY start_time ASC
+    `;
+    
+    db.all(sessionsQuery, [employeeId, date], (err, sessions) => {
+        if (err) {
+            console.error('Ошибка получения сессий дня:', err);
+            return res.status(500).json({ error: 'Ошибка базы данных' });
+        }
+        
+        // Получаем общую статистику за день
+        const statsQuery = `
+            SELECT 
+                total_minutes,
+                is_in_office
+            FROM daily_stats 
+            WHERE employee_id = ? AND date = ?
+        `;
+        
+        db.get(statsQuery, [employeeId, date], (err, stats) => {
+            if (err) {
+                console.error('Ошибка получения статистики дня:', err);
+                return res.status(500).json({ error: 'Ошибка базы данных' });
+            }
+            
+            // Обрабатываем сессии
+            const processedSessions = sessions.map(session => {
+                const startTime = new Date(session.start_time);
+                const endTime = session.end_time ? new Date(session.end_time) : null;
+                const duration = endTime ? Math.round((endTime - startTime) / 1000 / 60) : 0; // в минутах
+                
+                return {
+                    id: session.id,
+                    startTime: session.start_time,
+                    endTime: session.end_time,
+                    startTimeFormatted: startTime.toLocaleTimeString('ru-RU', { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                    }),
+                    endTimeFormatted: endTime ? endTime.toLocaleTimeString('ru-RU', { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                    }) : 'Активна',
+                    duration: duration,
+                    durationFormatted: formatTime(duration),
+                    isActive: session.is_active === 1
+                };
+            });
+            
+            // Рассчитываем общее время
+            const totalMinutes = stats ? stats.total_minutes : 0;
+            const isInOffice = stats ? stats.is_in_office === 1 : false;
+            
+            res.json({
+                date: date,
+                sessions: processedSessions,
+                totalMinutes: totalMinutes,
+                totalTimeFormatted: formatTime(totalMinutes),
+                isInOffice: isInOffice,
+                sessionsCount: sessions.length
+            });
+        });
+    });
+});
+
 // Обновить целевые часы сотрудника
 app.put('/api/employee/:id/target-hours', (req, res) => {
     const { id } = req.params;
