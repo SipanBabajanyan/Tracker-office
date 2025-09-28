@@ -154,9 +154,9 @@ export default function DayDetailPage() {
         </div>
       </div>
 
-      {/* Hero Section - компактный блок с датой */}
+      {/* Hero Section - блок даты на всю ширину */}
       <div className="py-6">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-white/90 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-6">
             <div className="flex items-center justify-between">
               {/* Left navigation */}
