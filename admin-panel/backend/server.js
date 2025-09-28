@@ -94,6 +94,16 @@ db.serialize(() => {
         FOREIGN KEY (employee_id) REFERENCES employees (id),
         UNIQUE(employee_id, date)
     )`);
+
+    // Таблица логов статусов (для серверного расчета времени)
+    db.run(`CREATE TABLE IF NOT EXISTS status_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        employee_id INTEGER,
+        is_in_office BOOLEAN NOT NULL,
+        timestamp DATETIME NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (employee_id) REFERENCES employees (id)
+    )`);
     
     // Добавляем поле is_in_office если его нет (игнорируем ошибки если колонка уже существует)
     db.run(`ALTER TABLE daily_stats ADD COLUMN is_in_office BOOLEAN DEFAULT 0`, (err) => {
@@ -109,8 +119,16 @@ db.serialize(() => {
 
 // Получить всех сотрудников
 app.get('/api/employees', (req, res) => {
-    // Простой запрос для начала - получаем всех сотрудников
-    const query = 'SELECT * FROM employees ORDER BY name';
+    // Получаем сотрудников с рассчитанным временем за сегодня
+    const query = `
+        SELECT 
+            e.*,
+            COALESCE(ds.total_minutes, 0) as total_minutes_today,
+            ds.is_in_office as currently_in_office
+        FROM employees e
+        LEFT JOIN daily_stats ds ON e.id = ds.employee_id AND ds.date = DATE('now')
+        ORDER BY e.name
+    `;
     
     db.all(query, [], (err, rows) => {
         if (err) {
@@ -118,15 +136,21 @@ app.get('/api/employees', (req, res) => {
             return res.status(500).json({ error: 'Ошибка базы данных: ' + err.message });
         }
 
-        const employees = rows.map(row => ({
-            id: row.id,
-            name: row.name || '',
-            deviceId: row.device_id || 'Неизвестно',
-            isInOffice: Boolean(row.is_in_office),
-            startTime: null,
-            totalTimeToday: '0ч 0м',
-            lastSeen: row.last_seen ? new Date(row.last_seen).toLocaleString('ru-RU') : 'Никогда'
-        }));
+        const employees = rows.map(row => {
+            const totalMinutes = row.total_minutes_today || 0;
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            
+            return {
+                id: row.id,
+                name: row.name || '',
+                deviceId: row.device_id || 'Неизвестно',
+                isInOffice: Boolean(row.currently_in_office),
+                startTime: null,
+                totalTimeToday: `${hours}ч ${minutes}м`,
+                lastSeen: row.last_seen ? new Date(row.last_seen).toLocaleString('ru-RU') : 'Никогда'
+            };
+        });
 
         res.json(employees);
     });
@@ -223,199 +247,60 @@ app.put('/api/employees/:id', (req, res) => {
     });
 });
 
-// Функция для управления сессиями в office_sessions
-function manageOfficeSession(employeeId, isInOffice, totalMinutes) {
-    // Проверяем, есть ли активная сессия для сотрудника
-    const checkActiveSessionQuery = `
-        SELECT id, start_time FROM office_sessions 
-        WHERE employee_id = ? AND is_active = 1
-        ORDER BY created_at DESC LIMIT 1
-    `;
-    
-    db.get(checkActiveSessionQuery, [employeeId], (err, activeSession) => {
-        if (err) {
-            console.error('Ошибка проверки активной сессии:', err);
-            return;
-        }
-        
-        if (activeSession) {
-            // Есть активная сессия
-            if (isInOffice) {
-                // Сотрудник все еще в офисе - не создаем новую сессию
-                console.log(`Активная сессия уже существует для Employee ${employeeId}, не создаем новую`);
-            } else {
-                // Сотрудник ушел - закрываем активную сессию
-                const closeSessionQuery = `
-                    UPDATE office_sessions 
-                    SET end_time = datetime('now'), is_active = 0
-                    WHERE id = ?
-                `;
-                
-                db.run(closeSessionQuery, [activeSession.id], function(err) {
-                    if (err) {
-                        console.error('Ошибка закрытия сессии:', err);
-                    } else {
-                        console.log(`Сессия закрыта: Employee ${employeeId}, Session ID: ${activeSession.id}`);
-                    }
-                });
-            }
-        } else {
-            // Нет активной сессии
-            if (isInOffice && totalMinutes > 0) {
-                // Сотрудник в офисе - создаем новую сессию
-                const now = new Date();
-                
-                const createSessionQuery = `
-                    INSERT INTO office_sessions (employee_id, start_time, end_time, is_active)
-                    VALUES (?, ?, ?, ?)
-                `;
-                
-                db.run(createSessionQuery, [
-                    employeeId, 
-                    now.toISOString(), // start_time = текущее время
-                    null, // end_time = null для активной сессии
-                    1 // is_active = 1
-                ], function(err) {
-                    if (err) {
-                        console.error('Ошибка создания сессии:', err);
-                    } else {
-                        console.log(`Новая сессия создана: Employee ${employeeId}, Start: ${now.toISOString()}`);
-                    }
-                });
-            }
-        }
-    });
-}
+// СТАРАЯ ФУНКЦИЯ УДАЛЕНА - используем новую систему расчета времени
 
-// Отправить сессию сотрудника (вызывается мобильным приложением)
-app.post('/api/employee/:id/session', async (req, res) => {
+// Отправить статус сотрудника (НОВЫЙ API - только статус)
+app.post('/api/employee/:id/status', async (req, res) => {
     const employeeId = req.params.id;
-    const { date, totalMinutes, isInOffice } = req.body;
+    const { isInOffice, timestamp } = req.body;
 
-    if (!date || typeof totalMinutes !== 'number' || typeof isInOffice !== 'boolean') {
-        return res.status(400).json({ error: 'Неверные данные' });
+    if (typeof isInOffice !== 'boolean' || !timestamp) {
+        return res.status(400).json({ error: 'Неверные данные: нужны isInOffice и timestamp' });
     }
 
     try {
-        // Проверяем, является ли день рабочим
-        if (isWorkingDay(date)) {
-            // Создаем запись рабочего дня, если её нет
-            await createWorkDay(employeeId, date);
-            
-            // Обновляем фактическое время прихода/ухода
-            await updateWorkDayActualTime(employeeId, date, totalMinutes);
-        }
-
-        // Обновляем daily_stats (существующая логика)
-        const updateQuery = `
-            UPDATE daily_stats 
-            SET total_minutes = ?, is_in_office = ?
-            WHERE employee_id = ? AND date = ?
+        // Сохраняем статус в лог
+        const logQuery = `
+            INSERT INTO status_logs (employee_id, is_in_office, timestamp)
+            VALUES (?, ?, ?)
         `;
         
-        db.run(updateQuery, [totalMinutes, isInOffice ? 1 : 0, employeeId, date], function(err) {
+        db.run(logQuery, [employeeId, isInOffice ? 1 : 0, timestamp], function(err) {
             if (err) {
-                console.error('Ошибка обновления сессии:', err);
+                console.error('Ошибка сохранения статуса:', err);
                 return res.status(500).json({ error: 'Ошибка базы данных' });
             }
             
-            if (this.changes > 0) {
-                // Запись обновлена
-                console.log(`Сессия обновлена: Employee ${employeeId}, Date: ${date}, Minutes: ${totalMinutes}, InOffice: ${isInOffice}`);
-                updateEmployeeStatus();
-            } else {
-                // Записи нет, создаем новую
-                const insertQuery = `
-                    INSERT INTO daily_stats (employee_id, date, total_minutes, is_in_office)
-                    VALUES (?, ?, ?, ?)
-                `;
-                
-                db.run(insertQuery, [employeeId, date, totalMinutes, isInOffice ? 1 : 0], function(err) {
-                    if (err) {
-                        console.error('Ошибка создания сессии:', err);
-                        return res.status(500).json({ error: 'Ошибка базы данных' });
-                    }
-                    
-                    console.log(`Сессия создана: Employee ${employeeId}, Date: ${date}, Minutes: ${totalMinutes}, InOffice: ${isInOffice}`);
-                    updateEmployeeStatus();
-                });
-            }
-        });
-
-        // Управляем сессиями в office_sessions
-        manageOfficeSession(employeeId, isInOffice, totalMinutes);
-
-        function updateEmployeeStatus() {
+            console.log(`Статус сохранен: Employee ${employeeId}, InOffice: ${isInOffice}, Time: ${timestamp}`);
+            
+            // Пересчитываем время для этого сотрудника
+            recalculateEmployeeTime(employeeId, timestamp.split('T')[0]);
+            
             // Обновляем статус сотрудника
             const updateEmployeeQuery = `
                 UPDATE employees 
-                SET is_in_office = ?, last_seen = datetime('now')
+                SET is_in_office = ?, last_seen = ?
                 WHERE id = ?
             `;
             
-            db.run(updateEmployeeQuery, [isInOffice ? 1 : 0, employeeId], function(err) {
+            db.run(updateEmployeeQuery, [isInOffice ? 1 : 0, timestamp, employeeId], function(err) {
                 if (err) {
                     console.error('Ошибка обновления статуса сотрудника:', err);
                     return res.status(500).json({ error: 'Ошибка базы данных' });
                 }
 
-                res.json({ message: 'Сессия сохранена успешно' });
+                res.json({ message: 'Статус сохранен успешно' });
             });
-        }
+        });
     } catch (error) {
-        console.error('Ошибка обработки сессии:', error);
-        res.status(500).json({ error: 'Ошибка обработки сессии' });
+        console.error('Ошибка обработки статуса:', error);
+        res.status(500).json({ error: 'Ошибка обработки статуса' });
     }
 });
 
-// Обновить статус сотрудника (вызывается мобильным приложением)
-app.post('/api/tracking/status', (req, res) => {
-    const { deviceId, isInOffice } = req.body;
+// СТАРЫЙ API УДАЛЕН - используем только новый /api/employee/:id/status
 
-    if (!deviceId || typeof isInOffice !== 'boolean') {
-        return res.status(400).json({ error: 'Неверные данные' });
-    }
-
-    // Находим сотрудника по device_id
-    db.get('SELECT id FROM employees WHERE device_id = ?', [deviceId], (err, employee) => {
-        if (err) {
-            console.error('Ошибка поиска сотрудника:', err);
-            return res.status(500).json({ error: 'Ошибка базы данных' });
-        }
-
-        if (!employee) {
-            return res.status(404).json({ error: 'Сотрудник не найден' });
-        }
-
-        const employeeId = employee.id;
-
-        if (isInOffice) {
-            // Начинаем новую сессию
-            const query = 'INSERT INTO office_sessions (employee_id, start_time, is_active) VALUES (?, ?, 1)';
-            db.run(query, [employeeId, new Date().toISOString()], function(err) {
-                if (err) {
-                    console.error('Ошибка начала сессии:', err);
-                    return res.status(500).json({ error: 'Ошибка базы данных' });
-                }
-                res.json({ message: 'Сессия начата' });
-            });
-        } else {
-            // Завершаем активную сессию
-            const query = `
-                UPDATE office_sessions 
-                SET end_time = ?, is_active = 0 
-                WHERE employee_id = ? AND is_active = 1
-            `;
-            db.run(query, [new Date().toISOString(), employeeId], function(err) {
-                if (err) {
-                    console.error('Ошибка завершения сессии:', err);
-                    return res.status(500).json({ error: 'Ошибка базы данных' });
-                }
-                res.json({ message: 'Сессия завершена' });
-            });
-        }
-    });
-});
+// СТАРЫЙ API УДАЛЕН - используем только новый /api/employee/:id/status
 
 // Экспорт данных в CSV
 app.get('/api/export/csv', (req, res) => {
@@ -1252,6 +1137,99 @@ function getWorkDayStatus(workDay) {
     if (workDay.is_late) return 'Опоздал';
     if (workDay.is_early_leave) return 'Ушел раньше';
     return 'Время соблюдено';
+}
+
+// Функция для серверного расчета времени на основе статусов
+function recalculateEmployeeTime(employeeId, date) {
+    console.log(`🔄 Пересчет времени для Employee ${employeeId} на ${date}`);
+    
+    // Получаем все статусы за день
+    const statusQuery = `
+        SELECT is_in_office, timestamp
+        FROM status_logs 
+        WHERE employee_id = ? AND DATE(timestamp) = ?
+        ORDER BY timestamp ASC
+    `;
+    
+    db.all(statusQuery, [employeeId, date], (err, statuses) => {
+        if (err) {
+            console.error('Ошибка получения статусов:', err);
+            return;
+        }
+        
+        if (statuses.length === 0) {
+            console.log(`Нет статусов для Employee ${employeeId} на ${date}`);
+            return;
+        }
+        
+        // Рассчитываем общее время в офисе
+        let totalMinutes = 0;
+        let sessionStart = null;
+        let isCurrentlyInOffice = false;
+        
+        for (let i = 0; i < statuses.length; i++) {
+            const status = statuses[i];
+            const timestamp = new Date(status.timestamp);
+            
+            if (status.is_in_office && !isCurrentlyInOffice) {
+                // Начало работы
+                sessionStart = timestamp;
+                isCurrentlyInOffice = true;
+                console.log(`📅 Начало работы: ${timestamp.toISOString()}`);
+            } else if (!status.is_in_office && isCurrentlyInOffice) {
+                // Конец работы
+                if (sessionStart) {
+                    const sessionDuration = Math.round((timestamp - sessionStart) / 1000 / 60);
+                    totalMinutes += sessionDuration;
+                    console.log(`📅 Конец работы: ${timestamp.toISOString()}, Длительность: ${sessionDuration} мин`);
+                }
+                sessionStart = null;
+                isCurrentlyInOffice = false;
+            }
+        }
+        
+        // Если сотрудник все еще в офисе (последний статус - в офисе)
+        if (isCurrentlyInOffice && sessionStart) {
+            const now = new Date();
+            const currentSessionDuration = Math.round((now - sessionStart) / 1000 / 60);
+            totalMinutes += currentSessionDuration;
+            console.log(`📅 Текущая сессия: ${currentSessionDuration} мин (в процессе)`);
+        }
+        
+        console.log(`✅ Итого времени в офисе: ${totalMinutes} минут`);
+        
+        // Обновляем daily_stats с рассчитанным временем
+        const updateStatsQuery = `
+            UPDATE daily_stats 
+            SET total_minutes = ?, is_in_office = ?
+            WHERE employee_id = ? AND date = ?
+        `;
+        
+        db.run(updateStatsQuery, [totalMinutes, isCurrentlyInOffice ? 1 : 0, employeeId, date], function(err) {
+            if (err) {
+                console.error('Ошибка обновления статистики:', err);
+                return;
+            }
+            
+            if (this.changes > 0) {
+                console.log(`📊 Статистика обновлена: Employee ${employeeId}, ${date}, ${totalMinutes} мин`);
+            } else {
+                // Создаем новую запись если её нет
+                const insertStatsQuery = `
+                    INSERT INTO daily_stats (employee_id, date, total_minutes, is_in_office)
+                    VALUES (?, ?, ?, ?)
+                `;
+                
+                db.run(insertStatsQuery, [employeeId, date, totalMinutes, isCurrentlyInOffice ? 1 : 0], function(err) {
+                    if (err) {
+                        console.error('Ошибка создания статистики:', err);
+                    } else {
+                        console.log(`📊 Статистика создана: Employee ${employeeId}, ${date}, ${totalMinutes} мин`);
+                    }
+                });
+            }
+        });
+    });
 }
 
 // Функция для автоматического создания рабочих дней
