@@ -244,32 +244,101 @@ export default function EmployeeDetail() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      {/* Header */}
-      <div className="bg-white/80 backdrop-blur-md shadow-xl border-b border-white/20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-6">
-            <div className="flex items-center space-x-4">
+      {/* Modern Minimalist Header */}
+      <div className="bg-white/90 backdrop-blur-xl shadow-sm border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-8 py-6">
+          <div className="flex items-center justify-between">
+            {/* Left Section - Back Button */}
+            <div className="flex items-center">
               <button
                 onClick={() => router.push('/')}
-                className="bg-gradient-to-r from-gray-500 to-gray-600 text-white p-3 rounded-xl hover:from-gray-600 hover:to-gray-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                className="group p-2 rounded-xl hover:bg-gray-100 transition-all duration-200"
               >
-                <ArrowLeft className="h-5 w-5" />
+                <ArrowLeft className="h-5 w-5 text-gray-600 group-hover:text-gray-900 transition-colors" />
               </button>
-              <div>
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                  👤 {employee.name}
-                </h1>
-                <p className="text-gray-600">ID: {employee.deviceId}</p>
-              </div>
             </div>
             
-            <div className="flex items-center space-x-4">
-              <div className={`px-4 py-2 rounded-full text-sm font-bold ${
+            {/* Center Section - Employee Info */}
+            <div className="text-center">
+                {editingName ? (
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="text"
+                      value={newName}
+                      onChange={(e) => setNewName(e.target.value)}
+                      className="text-2xl font-semibold text-gray-900 bg-transparent border-b border-blue-500 focus:outline-none focus:border-blue-600 text-center"
+                      autoFocus
+                    />
+                    <button
+                      onClick={handleUpdateName}
+                      className="p-1.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingName(false);
+                        setNewName(employee.name);
+                      }}
+                      className="p-1.5 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center space-x-2">
+                    <h1 className="text-2xl font-semibold text-gray-900">
+                      {employee.name}
+                    </h1>
+                    <button
+                      onClick={() => setEditingName(true)}
+                      className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                
+                <div className="flex items-center justify-center space-x-6 mt-2">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 bg-blue-100 rounded-full flex items-center justify-center">
+                      <svg className="w-2.5 h-2.5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <span className="text-sm font-medium text-gray-600">ID: {employee.deviceId}</span>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 bg-green-100 rounded-full flex items-center justify-center">
+                      <svg className="w-2.5 h-2.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <span className="text-sm font-medium text-gray-600">
+                      Последняя активность: {employee.lastSeen || 'Никогда'}
+                    </span>
+                  </div>
+                </div>
+            </div>
+            
+            {/* Right Section - Status */}
+            <div className="flex items-center space-x-3">
+              <div className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium ${
                 employee.isInOffice
-                  ? 'bg-gradient-to-r from-green-100 to-green-200 text-green-800 border border-green-300'
-                  : 'bg-gradient-to-r from-red-100 to-red-200 text-red-800 border border-red-300'
+                  ? 'bg-green-50 text-green-700 border border-green-200'
+                  : 'bg-red-50 text-red-700 border border-red-200'
               }`}>
-                {employee.isInOffice ? 'В ОФИСЕ' : 'ВНЕ ОФИСА'}
+                <div className={`w-2 h-2 rounded-full ${
+                  employee.isInOffice ? 'bg-green-500' : 'bg-red-500'
+                }`}></div>
+                <span>{employee.isInOffice ? 'В офисе' : 'Вне офиса'}</span>
               </div>
             </div>
           </div>
@@ -277,62 +346,6 @@ export default function EmployeeDetail() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Employee Info Card */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-8 mb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-6">
-              <div className="bg-gradient-to-r from-blue-500 to-indigo-500 p-4 rounded-2xl">
-                <User className="h-8 w-8 text-white" />
-              </div>
-              <div>
-                {editingName ? (
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="text"
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                      className="text-2xl font-bold bg-transparent border-b-2 border-blue-500 focus:outline-none focus:border-blue-600"
-                      autoFocus
-                    />
-                    <button
-                      onClick={handleUpdateName}
-                      className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors"
-                    >
-                      ✓
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditingName(false);
-                        setNewName(employee.name);
-                      }}
-                      className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center space-x-3">
-                    <h2 className="text-2xl font-bold text-gray-900">{employee.name}</h2>
-                    <button
-                      onClick={() => setEditingName(true)}
-                      className="text-blue-500 hover:text-blue-600 transition-colors"
-                    >
-                      ✏️
-                    </button>
-                  </div>
-                )}
-                <p className="text-gray-600 mt-1">Последняя активность: {employee.lastSeen}</p>
-              </div>
-            </div>
-            
-            <div className="text-right">
-              <div className="text-3xl font-bold bg-gradient-to-r from-green-500 to-green-600 bg-clip-text text-transparent mb-2">
-                {employee.totalTimeToday}
-              </div>
-              <p className="text-gray-600">Сегодня</p>
-            </div>
-          </div>
-        </div>
 
         {/* Period Selector */}
         <div className="mb-8">
