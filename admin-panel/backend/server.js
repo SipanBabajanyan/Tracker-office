@@ -244,9 +244,8 @@ app.post('/api/employee/:id/session', async (req, res) => {
     }
 
     try {
-        // Проверяем, является ли день рабочим
-        if (isWorkingDay(date)) {
-            // Создаем запись рабочего дня, если её нет
+        // Создаем запись рабочего дня для любого дня, когда сотрудник работает
+        if (totalMinutes > 0) {
             await createWorkDay(employeeId, date);
             
             // Обновляем фактическое время прихода/ухода
