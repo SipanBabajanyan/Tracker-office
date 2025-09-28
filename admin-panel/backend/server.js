@@ -402,6 +402,34 @@ function formatTime(minutes) {
     return `${hours}:${mins.toString().padStart(2, '0')}`;
 }
 
+// Функция для определения рабочих дней (понедельник-пятница)
+function isWorkingDay(dateStr) {
+    const date = new Date(dateStr);
+    const dayOfWeek = date.getDay(); // 0 = воскресенье, 1 = понедельник, ..., 6 = суббота
+    return dayOfWeek >= 1 && dayOfWeek <= 5; // Понедельник-пятница
+}
+
+// Функция расчета коэффициента с учетом рабочих дней
+function calculateCoefficient(totalMinutes, targetHoursPerDay, dateStr) {
+    const targetMinutes = targetHoursPerDay * 60;
+    
+    if (isWorkingDay(dateStr)) {
+        // Рабочие дни: обычный расчет
+        return targetMinutes > 0 ? (totalMinutes / targetMinutes * 100) : 0;
+    } else {
+        // Нерабочие дни: 100% базовая ставка + процент от целевых часов
+        if (targetMinutes > 0 && totalMinutes > 0) {
+            return 100 + (totalMinutes / targetMinutes * 100);
+        } else if (totalMinutes > 0) {
+            // Если есть работа, но нет целевых часов - базовая ставка 100%
+            return 100;
+        } else {
+            // Если нет работы - 0%
+            return 0;
+        }
+    }
+}
+
         // Получить историю сотрудника
         app.get('/api/employee/:id/history', (req, res) => {
             const employeeId = req.params.id;
@@ -455,8 +483,8 @@ function formatTime(minutes) {
         }
 
         const history = rows.map(row => {
-            const targetMinutes = row.target_hours_per_day * 60;
-            const coefficient = targetMinutes > 0 ? (row.total_minutes / targetMinutes * 100) : 0;
+            const targetMinutes = isWorkingDay(row.date) ? row.target_hours_per_day * 60 : 0;
+            const coefficient = calculateCoefficient(row.total_minutes, row.target_hours_per_day, row.date);
             const timeDiff = row.total_minutes - targetMinutes;
             
             return {
@@ -508,43 +536,69 @@ function formatTime(minutes) {
     const query = `
         SELECT 
             e.target_hours_per_day,
-            COALESCE(AVG(ds.total_minutes), 0) as avg_minutes,
-            COALESCE(SUM(ds.total_minutes), 0) as total_minutes,
-            COUNT(ds.date) as days_count
+            ds.date,
+            ds.total_minutes
         FROM employees e
         LEFT JOIN daily_stats ds ON e.id = ds.employee_id ${dateFilter}
         WHERE e.id = ?
-        GROUP BY e.id, e.target_hours_per_day
+        ORDER BY ds.date
     `;
 
-    db.get(query, [employeeId], (err, row) => {
+    db.all(query, [employeeId], (err, rows) => {
         if (err) {
             console.error('Ошибка получения коэффициентов:', err);
             return res.status(500).json({ error: 'Ошибка базы данных' });
         }
 
-        if (!row) {
+        if (rows.length === 0) {
             return res.status(404).json({ error: 'Сотрудник не найден' });
         }
 
-        const targetMinutes = row.target_hours_per_day * 60;
-        const avgCoefficient = targetMinutes > 0 ? (row.avg_minutes / targetMinutes * 100) : 0;
-        const totalCoefficient = targetMinutes > 0 ? (row.total_minutes / (targetMinutes * row.days_count) * 100) : 0;
+        const targetHoursPerDay = rows[0].target_hours_per_day;
+        const targetMinutes = targetHoursPerDay * 60;
         
-        // Рассчитываем общее целевое время для периода
-        const totalTargetMinutes = targetMinutes * row.days_count;
-        const totalTimeDiff = Math.round(row.total_minutes - totalTargetMinutes);
+        // Рассчитываем коэффициенты с учетом рабочих дней
+        let totalMinutes = 0;
+        let totalTargetMinutes = 0;
+        let totalCoefficient = 0;
+        let workingDaysCount = 0;
+        let weekendDaysCount = 0;
+        
+        rows.forEach(row => {
+            if (row.date && row.total_minutes !== null && row.total_minutes !== undefined) {
+                totalMinutes += parseFloat(row.total_minutes) || 0;
+                
+                if (isWorkingDay(row.date)) {
+                    // Рабочие дни: добавляем к целевому времени
+                    totalTargetMinutes += targetMinutes;
+                    workingDaysCount++;
+                } else {
+                    // Нерабочие дни: не добавляем к целевому времени
+                    weekendDaysCount++;
+                }
+                
+                // Добавляем коэффициент дня
+                const dayCoefficient = calculateCoefficient(parseFloat(row.total_minutes) || 0, targetHoursPerDay, row.date);
+                totalCoefficient += dayCoefficient;
+            }
+        });
+        
+        const avgMinutes = rows.length > 0 ? totalMinutes / rows.length : 0;
+        const avgCoefficient = rows.length > 0 ? totalCoefficient / rows.length : 0;
+        const totalTimeDiff = Math.round(totalMinutes - totalTargetMinutes);
         
         res.json({
-            targetHours: row.target_hours_per_day,
+            targetHours: targetHoursPerDay,
             targetMinutes: targetMinutes,
-            totalTargetMinutes: totalTargetMinutes, // Общее целевое время за период
-            avgMinutes: Math.round(row.avg_minutes),
-            totalMinutes: Math.round(row.total_minutes),
-            daysCount: row.days_count,
+            totalTargetMinutes: totalTargetMinutes, // Общее целевое время за период (только рабочие дни)
+            avgMinutes: Math.round(avgMinutes),
+            totalMinutes: Math.round(totalMinutes),
+            daysCount: rows.length,
+            workingDaysCount: workingDaysCount,
+            weekendDaysCount: weekendDaysCount,
             avgCoefficient: Math.round(avgCoefficient),
             totalCoefficient: Math.round(totalCoefficient),
-            avgTimeDiff: Math.round(row.avg_minutes - targetMinutes),
+            avgTimeDiff: Math.round(avgMinutes - targetMinutes),
             totalTimeDiff: totalTimeDiff // Разница времени за весь период
         });
     });
