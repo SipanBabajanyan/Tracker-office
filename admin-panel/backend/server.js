@@ -812,6 +812,10 @@ function calculateCoefficient(totalMinutes, targetHoursPerDay, dateStr) {
         const avgCoefficient = rows.length > 0 ? totalCoefficient / rows.length : 0;
         const totalTimeDiff = Math.round(totalMinutes - totalTargetMinutes);
         
+        // Рассчитываем среднюю разницу времени только по рабочим дням
+        const avgMinutesWorkingDays = workingDaysCount > 0 ? totalMinutes / workingDaysCount : 0;
+        const avgTimeDiff = workingDaysCount > 0 ? Math.round(avgMinutesWorkingDays - targetMinutes) : 0;
+        
         res.json({
             targetHours: targetHoursPerDay,
             targetMinutes: targetMinutes,
@@ -823,7 +827,7 @@ function calculateCoefficient(totalMinutes, targetHoursPerDay, dateStr) {
             weekendDaysCount: weekendDaysCount,
             avgCoefficient: Math.round(avgCoefficient),
             totalCoefficient: Math.round(totalCoefficient),
-            avgTimeDiff: Math.round(avgMinutes - targetMinutes),
+            avgTimeDiff: avgTimeDiff, // Средняя разница времени только по рабочим дням
             totalTimeDiff: totalTimeDiff // Разница времени за весь период
         });
     });
