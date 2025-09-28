@@ -1054,6 +1054,55 @@ app.put('/api/employee/:id/work-day/:date', (req, res) => {
     });
 });
 
+// Получить рабочее расписание сотрудника
+app.get('/api/employee/:id/work-schedule', (req, res) => {
+    const employeeId = req.params.id;
+    
+    const query = 'SELECT default_work_start, default_work_end FROM employees WHERE id = ?';
+    
+    db.get(query, [employeeId], (err, row) => {
+        if (err) {
+            console.error('Ошибка получения рабочего расписания:', err);
+            return res.status(500).json({ error: 'Ошибка базы данных' });
+        }
+        
+        if (!row) {
+            return res.status(404).json({ error: 'Сотрудник не найден' });
+        }
+        
+        res.json({
+            defaultWorkStart: row.default_work_start || '10:00',
+            defaultWorkEnd: row.default_work_end || '19:00'
+        });
+    });
+});
+
+// Обновить рабочее расписание сотрудника
+app.put('/api/employee/:id/work-schedule', (req, res) => {
+    const employeeId = req.params.id;
+    const { defaultWorkStart, defaultWorkEnd } = req.body;
+    
+    const query = `
+        UPDATE employees SET 
+            default_work_start = ?,
+            default_work_end = ?
+        WHERE id = ?
+    `;
+    
+    db.run(query, [defaultWorkStart, defaultWorkEnd, employeeId], function(err) {
+        if (err) {
+            console.error('Ошибка обновления рабочего расписания:', err);
+            return res.status(500).json({ error: 'Ошибка базы данных' });
+        }
+        
+        if (this.changes === 0) {
+            return res.status(404).json({ error: 'Сотрудник не найден' });
+        }
+        
+        res.json({ message: 'Рабочее расписание обновлено' });
+    });
+});
+
 // Функция для определения статуса рабочего дня
 function getWorkDayStatus(workDay) {
     if (!workDay.is_present) return 'Отсутствовал';

@@ -79,7 +79,7 @@ export default function EmployeeDetail() {
       console.log(`🔄 Начинаем загрузку данных для периода: ${targetPeriod}`);
       
       // Загружаем данные сотрудника
-      const employeeResponse = await fetch(`http://192.168.15.20:3000/api/employees`);
+      const employeeResponse = await fetch(`http://localhost:3000/api/employees`);
       const employees = await employeeResponse.json();
       const currentEmployee = employees.find((emp: Employee) => emp.id === Number(employeeId));
       
@@ -89,7 +89,7 @@ export default function EmployeeDetail() {
         
         // Загружаем рабочее расписание
         try {
-          const scheduleResponse = await fetch(`http://192.168.15.20:3000/api/employee/${employeeId}/work-schedule`);
+          const scheduleResponse = await fetch(`http://localhost:3000/api/employee/${employeeId}/work-schedule`);
           const schedule = await scheduleResponse.json();
           setWorkSchedule(schedule);
           setNewWorkStart(schedule.workStart);
@@ -101,8 +101,8 @@ export default function EmployeeDetail() {
 
       // Загружаем историю и коэффициенты параллельно
       const [historyResponse, coefficientsResponse] = await Promise.all([
-        fetch(`http://192.168.15.20:3000/api/employee/${employeeId}/history?period=${targetPeriod}`),
-        fetch(`http://192.168.15.20:3000/api/employee/${employeeId}/coefficients?period=${targetPeriod}`)
+        fetch(`http://localhost:3000/api/employee/${employeeId}/history?period=${targetPeriod}`),
+        fetch(`http://localhost:3000/api/employee/${employeeId}/coefficients?period=${targetPeriod}`)
       ]);
 
       const historyData = await historyResponse.json();
@@ -127,7 +127,7 @@ export default function EmployeeDetail() {
     if (!employee || !newName.trim()) return;
 
     try {
-      const response = await fetch(`http://192.168.15.20:3000/api/employees/${employee.id}`, {
+      const response = await fetch(`http://localhost:3000/api/employees/${employee.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -150,12 +150,12 @@ export default function EmployeeDetail() {
     try {
       // Обновляем оба параметра параллельно
       const [targetHoursResponse, workScheduleResponse] = await Promise.all([
-        fetch(`http://192.168.15.20:3000/api/employee/${employee.id}/target-hours`, {
+        fetch(`http://localhost:3000/api/employee/${employee.id}/target-hours`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ targetHours: newTargetHours }),
         }),
-        fetch(`http://192.168.15.20:3000/api/employee/${employee.id}/work-schedule`, {
+        fetch(`http://localhost:3000/api/employee/${employee.id}/work-schedule`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 

@@ -42,7 +42,7 @@ export default function DayDetailPage() {
 
   const loadEmployeeName = async () => {
     try {
-      const response = await fetch(`http://192.168.15.20:3000/api/employees`);
+      const response = await fetch(`http://localhost:3000/api/employees`);
       if (response.ok) {
         const employees = await response.json();
         const employee = employees.find((emp: any) => emp.id === parseInt(employeeId));
@@ -58,7 +58,7 @@ export default function DayDetailPage() {
   const loadDayData = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`http://192.168.15.20:3000/api/employee/${employeeId}/day/${date}`);
+      const response = await fetch(`http://localhost:3000/api/employee/${employeeId}/day/${date}`);
       
       if (!response.ok) {
         throw new Error('Ошибка загрузки данных дня');
