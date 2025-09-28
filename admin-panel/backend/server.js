@@ -655,6 +655,19 @@ function calculateCoefficient(totalMinutes, targetHoursPerDay, dateStr) {
     }
 }
 
+// Функция расчета коэффициента для аналитики (упрощенная)
+function calculateAnalyticsCoefficient(totalMinutes, targetHoursPerDay, dateStr) {
+    const targetMinutes = targetHoursPerDay * 60;
+    
+    if (isWorkingDay(dateStr)) {
+        // Рабочие дни: обычный расчет
+        return targetMinutes > 0 ? (totalMinutes / targetMinutes * 100) : 0;
+    } else {
+        // Нерабочие дни: 100% если есть работа, 0% если нет
+        return totalMinutes > 0 ? 100 : 0;
+    }
+}
+
         // Получить историю сотрудника
         app.get('/api/employee/:id/history', (req, res) => {
             const employeeId = req.params.id;
@@ -802,8 +815,8 @@ function calculateCoefficient(totalMinutes, targetHoursPerDay, dateStr) {
                     weekendDaysCount++;
                 }
                 
-                // Добавляем коэффициент дня
-                const dayCoefficient = calculateCoefficient(parseFloat(row.total_minutes) || 0, targetHoursPerDay, row.date);
+                // Добавляем коэффициент дня (для аналитики используем упрощенную версию)
+                const dayCoefficient = calculateAnalyticsCoefficient(parseFloat(row.total_minutes) || 0, targetHoursPerDay, row.date);
                 totalCoefficient += dayCoefficient;
             }
         });
