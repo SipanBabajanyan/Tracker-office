@@ -472,115 +472,131 @@ function createWorkDay(employeeId, dateStr, workStartTime = '09:00', workEndTime
 // Функция для обновления фактического времени прихода/ухода
 function updateWorkDayActualTime(employeeId, dateStr, totalMinutes = 0) {
     return new Promise((resolve, reject) => {
-        // Получаем все сессии за день для определения первого входа и последнего выхода
-        const sessionsQuery = `
-            SELECT start_time, end_time, is_active
-            FROM office_sessions 
-            WHERE employee_id = ? AND DATE(start_time) = ?
-            ORDER BY start_time ASC
-        `;
-        
-        db.all(sessionsQuery, [employeeId, dateStr], (err, sessions) => {
+        // Получаем данные рабочего дня
+        const getQuery = 'SELECT * FROM work_days WHERE employee_id = ? AND date = ?';
+        db.get(getQuery, [employeeId, dateStr], (err, workDay) => {
             if (err) {
-                console.error('Ошибка получения сессий:', err);
+                console.error('Ошибка получения рабочего дня:', err);
                 reject(err);
                 return;
             }
             
-            // Определяем первый вход и последний выход
-            let actualStartTime = null;
-            let actualEndTime = null;
-            
-            if (sessions.length > 0) {
-                // Первый вход - время первой сессии
-                actualStartTime = sessions[0].start_time;
-                
-                // Последний выход - время последней завершенной сессии или текущее время если сессия активна
-                const lastSession = sessions[sessions.length - 1];
-                if (lastSession.end_time) {
-                    actualEndTime = lastSession.end_time;
-                } else if (lastSession.is_active) {
-                    actualEndTime = new Date().toISOString();
-                }
+            if (!workDay) {
+                console.log(`Рабочий день не найден для Employee ${employeeId}, Date: ${dateStr}`);
+                resolve(null);
+                return;
             }
             
-            // Получаем данные рабочего дня
-            const getQuery = 'SELECT * FROM work_days WHERE employee_id = ? AND date = ?';
-            db.get(getQuery, [employeeId, dateStr], (err, workDay) => {
+            // Получаем все сессии за день для определения первого входа и последнего выхода
+            const sessionsQuery = `
+                SELECT start_time, end_time, is_active
+                FROM office_sessions 
+                WHERE employee_id = ? AND DATE(start_time) = ?
+                ORDER BY start_time ASC
+            `;
+            
+            db.all(sessionsQuery, [employeeId, dateStr], (err, sessions) => {
                 if (err) {
-                    console.error('Ошибка получения рабочего дня:', err);
-                    reject(err);
+                    console.error('Ошибка получения сессий:', err);
+                    // Если нет таблицы office_sessions, используем текущее время как приблизительное
+                    console.log('Используем текущее время как приблизительное время входа');
+                    const now = new Date().toISOString();
+                    updateWorkDayRecord(workDay, now, now, totalMinutes, employeeId, dateStr, resolve, reject);
                     return;
                 }
                 
-                if (!workDay) {
-                    console.log(`Рабочий день не найден для Employee ${employeeId}, Date: ${dateStr}`);
-                    resolve(null);
-                    return;
-                }
+                // Определяем первый вход и последний выход
+                let actualStartTime = null;
+                let actualEndTime = null;
                 
-                // Рассчитываем опоздания и ранние уходы
-                let isLate = false;
-                let isEarlyLeave = false;
-                let lateMinutes = 0;
-                let earlyLeaveMinutes = 0;
-                let isPresent = totalMinutes > 0;
-                
-                if (actualStartTime && workDay.work_start_time) {
-                    const workStart = new Date(workDay.work_start_time);
-                    const actualStart = new Date(actualStartTime);
-                    if (actualStart > workStart) {
-                        isLate = true;
-                        lateMinutes = Math.round((actualStart - workStart) / 1000 / 60);
+                if (sessions.length > 0) {
+                    // Первый вход - время первой сессии
+                    actualStartTime = sessions[0].start_time;
+                    
+                    // Последний выход - время последней завершенной сессии или текущее время если сессия активна
+                    const lastSession = sessions[sessions.length - 1];
+                    if (lastSession.end_time) {
+                        actualEndTime = lastSession.end_time;
+                    } else if (lastSession.is_active) {
+                        actualEndTime = new Date().toISOString();
+                    }
+                } else {
+                    // Если нет сессий, но есть время в офисе, используем приблизительное время
+                    if (totalMinutes > 0) {
+                        const now = new Date();
+                        const startTime = new Date(now.getTime() - totalMinutes * 60000);
+                        actualStartTime = startTime.toISOString();
+                        actualEndTime = now.toISOString();
                     }
                 }
                 
-                if (actualEndTime && workDay.work_end_time) {
-                    const workEnd = new Date(workDay.work_end_time);
-                    const actualEnd = new Date(actualEndTime);
-                    if (actualEnd < workEnd) {
-                        isEarlyLeave = true;
-                        earlyLeaveMinutes = Math.round((workEnd - actualEnd) / 1000 / 60);
-                    }
-                }
-                
-                // Обновляем запись
-                const updateQuery = `
-                    UPDATE work_days SET 
-                        actual_start_time = ?,
-                        actual_end_time = ?,
-                        total_minutes = ?,
-                        is_present = ?,
-                        is_late = ?,
-                        is_early_leave = ?,
-                        late_minutes = ?,
-                        early_leave_minutes = ?,
-                        updated_at = datetime('now')
-                    WHERE employee_id = ? AND date = ?
-                `;
-                
-                db.run(updateQuery, [
-                    actualStartTime,
-                    actualEndTime,
-                    totalMinutes,
-                    isPresent ? 1 : 0,
-                    isLate ? 1 : 0,
-                    isEarlyLeave ? 1 : 0,
-                    lateMinutes,
-                    earlyLeaveMinutes,
-                    employeeId,
-                    dateStr
-                ], function(err) {
-                    if (err) {
-                        console.error('Ошибка обновления рабочего дня:', err);
-                        reject(err);
-                    } else {
-                        console.log(`Рабочий день обновлен: Employee ${employeeId}, Date: ${dateStr}`);
-                        resolve(this.changes);
-                    }
-                });
+                updateWorkDayRecord(workDay, actualStartTime, actualEndTime, totalMinutes, employeeId, dateStr, resolve, reject);
             });
         });
+    });
+}
+
+// Вспомогательная функция для обновления записи рабочего дня
+function updateWorkDayRecord(workDay, actualStartTime, actualEndTime, totalMinutes, employeeId, dateStr, resolve, reject) {
+    // Рассчитываем опоздания и ранние уходы
+    let isLate = false;
+    let isEarlyLeave = false;
+    let lateMinutes = 0;
+    let earlyLeaveMinutes = 0;
+    let isPresent = totalMinutes > 0;
+    
+    if (actualStartTime && workDay.work_start_time) {
+        const workStart = new Date(workDay.work_start_time);
+        const actualStart = new Date(actualStartTime);
+        if (actualStart > workStart) {
+            isLate = true;
+            lateMinutes = Math.round((actualStart - workStart) / 1000 / 60);
+        }
+    }
+    
+    if (actualEndTime && workDay.work_end_time) {
+        const workEnd = new Date(workDay.work_end_time);
+        const actualEnd = new Date(actualEndTime);
+        if (actualEnd < workEnd) {
+            isEarlyLeave = true;
+            earlyLeaveMinutes = Math.round((workEnd - actualEnd) / 1000 / 60);
+        }
+    }
+    
+    // Обновляем запись
+    const updateQuery = `
+        UPDATE work_days SET 
+            actual_start_time = ?,
+            actual_end_time = ?,
+            total_minutes = ?,
+            is_present = ?,
+            is_late = ?,
+            is_early_leave = ?,
+            late_minutes = ?,
+            early_leave_minutes = ?,
+            updated_at = datetime('now')
+        WHERE employee_id = ? AND date = ?
+    `;
+    
+    db.run(updateQuery, [
+        actualStartTime,
+        actualEndTime,
+        totalMinutes,
+        isPresent ? 1 : 0,
+        isLate ? 1 : 0,
+        isEarlyLeave ? 1 : 0,
+        lateMinutes,
+        earlyLeaveMinutes,
+        employeeId,
+        dateStr
+    ], function(err) {
+        if (err) {
+            console.error('Ошибка обновления рабочего дня:', err);
+            reject(err);
+        } else {
+            console.log(`Рабочий день обновлен: Employee ${employeeId}, Date: ${dateStr}`);
+            resolve(this.changes);
+        }
     });
 }
 
