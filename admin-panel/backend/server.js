@@ -117,6 +117,46 @@ db.serialize(() => {
 
 // API Routes
 
+// Удалить сотрудника и все связанные данные
+app.delete('/api/employee/:id', (req, res) => {
+    const employeeId = req.params.id;
+    
+    console.log(`🗑️ Удаление сотрудника ID: ${employeeId}`);
+    
+    // Удаляем все связанные данные в правильном порядке
+    const deleteQueries = [
+        'DELETE FROM status_logs WHERE employee_id = ?',
+        'DELETE FROM office_sessions WHERE employee_id = ?', 
+        'DELETE FROM daily_stats WHERE employee_id = ?',
+        'DELETE FROM work_days WHERE employee_id = ?',
+        'DELETE FROM employees WHERE id = ?'
+    ];
+    
+    let completed = 0;
+    let hasError = false;
+    
+    deleteQueries.forEach((query, index) => {
+        db.run(query, [employeeId], function(err) {
+            if (err) {
+                console.error(`Ошибка удаления (запрос ${index + 1}):`, err);
+                if (!hasError) {
+                    hasError = true;
+                    res.status(500).json({ error: 'Ошибка удаления данных сотрудника' });
+                }
+                return;
+            }
+            
+            console.log(`✅ Удалено записей (запрос ${index + 1}): ${this.changes}`);
+            completed++;
+            
+            if (completed === deleteQueries.length && !hasError) {
+                console.log(`✅ Сотрудник ID ${employeeId} и все связанные данные удалены`);
+                res.json({ message: 'Сотрудник и все связанные данные удалены успешно' });
+            }
+        });
+    });
+});
+
 // Получить всех сотрудников
 app.get('/api/employees', (req, res) => {
     // Получаем сотрудников с рассчитанным временем за сегодня
@@ -274,7 +314,9 @@ app.post('/api/employee/:id/status', async (req, res) => {
             console.log(`Статус сохранен: Employee ${employeeId}, InOffice: ${isInOffice}, Time: ${timestamp}`);
             
             // Пересчитываем время для этого сотрудника
-            recalculateEmployeeTime(employeeId, timestamp.split('T')[0]);
+            recalculateEmployeeTime(employeeId, timestamp.split('T')[0]).catch(err => {
+                console.error('Ошибка пересчета времени:', err);
+            });
             
             // Обновляем статус сотрудника
             const updateEmployeeQuery = `
@@ -1139,33 +1181,90 @@ function getWorkDayStatus(workDay) {
     return 'Время соблюдено';
 }
 
+// Функция для создания сессий в базе данных
+function createSessionsInDatabase(employeeId, sessions) {
+    return new Promise((resolve, reject) => {
+        if (sessions.length === 0) {
+            resolve();
+            return;
+        }
+        
+        // Удаляем старые сессии за этот день
+        const deleteQuery = `
+            DELETE FROM office_sessions 
+            WHERE employee_id = ? AND DATE(start_time) = ?
+        `;
+        
+        db.run(deleteQuery, [employeeId, sessions[0].startTime.split('T')[0]], (err) => {
+            if (err) {
+                console.error('Ошибка удаления старых сессий:', err);
+                reject(err);
+                return;
+            }
+            
+            // Создаем новые сессии
+            let completed = 0;
+            sessions.forEach((session, index) => {
+                const insertQuery = `
+                    INSERT INTO office_sessions (employee_id, start_time, end_time, is_active)
+                    VALUES (?, ?, ?, ?)
+                `;
+                
+                db.run(insertQuery, [
+                    employeeId,
+                    session.startTime,
+                    session.endTime,
+                    session.isActive ? 1 : 0
+                ], (err) => {
+                    if (err) {
+                        console.error('Ошибка создания сессии:', err);
+                        reject(err);
+                        return;
+                    }
+                    
+                    console.log(`📊 Сессия создана: ${session.startTime} - ${session.endTime || 'Активна'}`);
+                    
+                    completed++;
+                    if (completed === sessions.length) {
+                        resolve();
+                    }
+                });
+            });
+        });
+    });
+}
+
 // Функция для серверного расчета времени на основе статусов
-function recalculateEmployeeTime(employeeId, date) {
+async function recalculateEmployeeTime(employeeId, date) {
     console.log(`🔄 Пересчет времени для Employee ${employeeId} на ${date}`);
     
-    // Получаем все статусы за день
-    const statusQuery = `
-        SELECT is_in_office, timestamp
-        FROM status_logs 
-        WHERE employee_id = ? AND DATE(timestamp) = ?
-        ORDER BY timestamp ASC
-    `;
-    
-    db.all(statusQuery, [employeeId, date], (err, statuses) => {
-        if (err) {
-            console.error('Ошибка получения статусов:', err);
-            return;
-        }
+    return new Promise((resolve, reject) => {
+        // Получаем все статусы за день
+        const statusQuery = `
+            SELECT is_in_office, timestamp
+            FROM status_logs 
+            WHERE employee_id = ? AND DATE(timestamp) = ?
+            ORDER BY timestamp ASC
+        `;
         
-        if (statuses.length === 0) {
-            console.log(`Нет статусов для Employee ${employeeId} на ${date}`);
-            return;
-        }
+        db.all(statusQuery, [employeeId, date], async (err, statuses) => {
+            if (err) {
+                console.error('Ошибка получения статусов:', err);
+                reject(err);
+                return;
+            }
+            
+            if (statuses.length === 0) {
+                console.log(`Нет статусов для Employee ${employeeId} на ${date}`);
+                resolve();
+                return;
+            }
         
-        // Рассчитываем общее время в офисе
+        // Рассчитываем общее время в офисе и создаем сессии
         let totalMinutes = 0;
         let sessionStart = null;
         let isCurrentlyInOffice = false;
+        const sessionsToCreate = [];
         
         for (let i = 0; i < statuses.length; i++) {
             const status = statuses[i];
@@ -1182,6 +1281,13 @@ function recalculateEmployeeTime(employeeId, date) {
                     const sessionDuration = Math.round((timestamp - sessionStart) / 1000 / 60);
                     totalMinutes += sessionDuration;
                     console.log(`📅 Конец работы: ${timestamp.toISOString()}, Длительность: ${sessionDuration} мин`);
+                    
+                    // Сохраняем сессию для создания
+                    sessionsToCreate.push({
+                        startTime: sessionStart.toISOString(),
+                        endTime: timestamp.toISOString(),
+                        duration: sessionDuration
+                    });
                 }
                 sessionStart = null;
                 isCurrentlyInOffice = false;
@@ -1194,9 +1300,20 @@ function recalculateEmployeeTime(employeeId, date) {
             const currentSessionDuration = Math.round((now - sessionStart) / 1000 / 60);
             totalMinutes += currentSessionDuration;
             console.log(`📅 Текущая сессия: ${currentSessionDuration} мин (в процессе)`);
+            
+            // Добавляем текущую сессию (без end_time)
+            sessionsToCreate.push({
+                startTime: sessionStart.toISOString(),
+                endTime: null,
+                duration: currentSessionDuration,
+                isActive: true
+            });
         }
         
         console.log(`✅ Итого времени в офисе: ${totalMinutes} минут`);
+        
+        // Создаем сессии в базе данных
+        await createSessionsInDatabase(employeeId, sessionsToCreate);
         
         // Обновляем daily_stats с рассчитанным временем
         const updateStatsQuery = `
@@ -1205,29 +1322,34 @@ function recalculateEmployeeTime(employeeId, date) {
             WHERE employee_id = ? AND date = ?
         `;
         
-        db.run(updateStatsQuery, [totalMinutes, isCurrentlyInOffice ? 1 : 0, employeeId, date], function(err) {
-            if (err) {
-                console.error('Ошибка обновления статистики:', err);
-                return;
-            }
-            
-            if (this.changes > 0) {
-                console.log(`📊 Статистика обновлена: Employee ${employeeId}, ${date}, ${totalMinutes} мин`);
-            } else {
-                // Создаем новую запись если её нет
-                const insertStatsQuery = `
-                    INSERT INTO daily_stats (employee_id, date, total_minutes, is_in_office)
-                    VALUES (?, ?, ?, ?)
-                `;
+            db.run(updateStatsQuery, [totalMinutes, isCurrentlyInOffice ? 1 : 0, employeeId, date], function(err) {
+                if (err) {
+                    console.error('Ошибка обновления статистики:', err);
+                    reject(err);
+                    return;
+                }
                 
-                db.run(insertStatsQuery, [employeeId, date, totalMinutes, isCurrentlyInOffice ? 1 : 0], function(err) {
-                    if (err) {
-                        console.error('Ошибка создания статистики:', err);
-                    } else {
-                        console.log(`📊 Статистика создана: Employee ${employeeId}, ${date}, ${totalMinutes} мин`);
-                    }
-                });
-            }
+                if (this.changes > 0) {
+                    console.log(`📊 Статистика обновлена: Employee ${employeeId}, ${date}, ${totalMinutes} мин`);
+                    resolve();
+                } else {
+                    // Создаем новую запись если её нет
+                    const insertStatsQuery = `
+                        INSERT INTO daily_stats (employee_id, date, total_minutes, is_in_office)
+                        VALUES (?, ?, ?, ?)
+                    `;
+                    
+                    db.run(insertStatsQuery, [employeeId, date, totalMinutes, isCurrentlyInOffice ? 1 : 0], function(err) {
+                        if (err) {
+                            console.error('Ошибка создания статистики:', err);
+                            reject(err);
+                        } else {
+                            console.log(`📊 Статистика создана: Employee ${employeeId}, ${date}, ${totalMinutes} мин`);
+                            resolve();
+                        }
+                    });
+                }
+            });
         });
     });
 }

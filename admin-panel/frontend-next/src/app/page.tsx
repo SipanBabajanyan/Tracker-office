@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Users, Clock, TrendingUp, Calendar, LogOut } from 'lucide-react';
+import { Users, Clock, TrendingUp, Calendar, LogOut, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface Employee {
@@ -131,6 +131,31 @@ export default function Dashboard() {
 
   const handleLogout = () => {
     logout();
+  };
+
+  const handleDeleteEmployee = async (employeeId: number, employeeName: string, event: React.MouseEvent) => {
+    event.stopPropagation(); // Останавливаем переход на страницу сотрудника
+    
+    if (!confirm(`Вы уверены, что хотите удалить сотрудника "${employeeName}" и все связанные с ним данные? Это действие нельзя отменить.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:3000/api/employee/${employeeId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        alert('Сотрудник успешно удален');
+        loadEmployees(); // Перезагружаем список
+      } else {
+        const error = await response.json();
+        alert(`Ошибка удаления: ${error.error || 'Неизвестная ошибка'}`);
+      }
+    } catch (error) {
+      console.error('Ошибка удаления сотрудника:', error);
+      alert('Ошибка при удалении сотрудника');
+    }
   };
 
   if (loading || authLoading) {
@@ -298,6 +323,17 @@ export default function Dashboard() {
                     <p className="text-sm text-gray-500">Последняя активность: {employee.lastSeen}</p>
                   </div>
                   
+                  {/* Action Buttons */}
+                  <div className="flex flex-col space-y-2 mr-4">
+                    <button
+                      onClick={(e) => handleDeleteEmployee(employee.id, employee.name, e)}
+                      className="bg-red-500 hover:bg-red-600 text-white p-2 rounded-lg transition-colors duration-200 flex items-center justify-center group"
+                      title="Удалить сотрудника"
+                    >
+                      <Trash2 className="h-4 w-4 group-hover:scale-110 transition-transform" />
+                    </button>
+                  </div>
+
                   {/* Analytics Cards */}
                   {employee.analytics && (
                     <div className="grid grid-cols-4 gap-3">

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Clock, Calendar, TrendingUp, User, Activity } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar, TrendingUp, User, Activity, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface EmployeeHistory {
@@ -191,6 +191,31 @@ export default function EmployeeDetail() {
     setNewWorkEnd(workSchedule.workEnd);
   };
 
+  const handleDeleteEmployee = async () => {
+    if (!employee) return;
+    
+    if (!confirm(`Вы уверены, что хотите удалить сотрудника "${employee.name}" и все связанные с ним данные? Это действие нельзя отменить.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:3000/api/employee/${employee.id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        alert('Сотрудник успешно удален');
+        router.push('/'); // Возвращаемся на главную страницу
+      } else {
+        const error = await response.json();
+        alert(`Ошибка удаления: ${error.error || 'Неизвестная ошибка'}`);
+      }
+    } catch (error) {
+      console.error('Ошибка удаления сотрудника:', error);
+      alert('Ошибка при удалении сотрудника');
+    }
+  };
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('ru-RU', {
@@ -369,7 +394,7 @@ export default function EmployeeDetail() {
                 </div>
             </div>
             
-            {/* Right Section - Status */}
+            {/* Right Section - Status and Actions */}
             <div className="flex items-center space-x-3">
               <div className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium ${
                 employee.isInOffice
@@ -381,6 +406,14 @@ export default function EmployeeDetail() {
                 }`}></div>
                 <span>{employee.isInOffice ? 'В офисе' : 'Вне офиса'}</span>
               </div>
+              
+              <button
+                onClick={handleDeleteEmployee}
+                className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors duration-200 flex items-center justify-center group"
+                title="Удалить сотрудника"
+              >
+                <Trash2 className="h-4 w-4 group-hover:scale-110 transition-transform" />
+              </button>
             </div>
           </div>
         </div>
