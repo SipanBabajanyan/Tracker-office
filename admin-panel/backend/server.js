@@ -3,6 +3,7 @@ const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
 const moment = require('moment');
 const path = require('path');
+const cron = require('node-cron');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -446,26 +447,47 @@ function isWorkingDay(dateStr) {
 }
 
 // Функция для создания записи рабочего дня
-function createWorkDay(employeeId, dateStr, workStartTime = '09:00', workEndTime = '18:00') {
+function createWorkDay(employeeId, dateStr, workStartTime = null, workEndTime = null) {
     return new Promise((resolve, reject) => {
-        const workStartDateTime = `${dateStr} ${workStartTime}:00`;
-        const workEndDateTime = `${dateStr} ${workEndTime}:00`;
-        
-        const query = `
-            INSERT OR IGNORE INTO work_days 
-            (employee_id, date, work_start_time, work_end_time, created_at, updated_at)
-            VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
-        `;
-        
-        db.run(query, [employeeId, dateStr, workStartDateTime, workEndDateTime], function(err) {
-            if (err) {
-                console.error('Ошибка создания рабочего дня:', err);
-                reject(err);
-            } else {
-                console.log(`Рабочий день создан: Employee ${employeeId}, Date: ${dateStr}`);
-                resolve(this.lastID);
-            }
-        });
+        // Если время не указано, получаем индивидуальное время сотрудника
+        if (!workStartTime || !workEndTime) {
+            const query = 'SELECT default_work_start, default_work_end FROM employees WHERE id = ?';
+            db.get(query, [employeeId], (err, employee) => {
+                if (err) {
+                    console.error('Ошибка получения рабочего времени сотрудника:', err);
+                    reject(err);
+                    return;
+                }
+                
+                const startTime = workStartTime || employee?.default_work_start || '10:00';
+                const endTime = workEndTime || employee?.default_work_end || '19:00';
+                createWorkDayRecord(employeeId, dateStr, startTime, endTime, resolve, reject);
+            });
+        } else {
+            createWorkDayRecord(employeeId, dateStr, workStartTime, workEndTime, resolve, reject);
+        }
+    });
+}
+
+// Вспомогательная функция для создания записи рабочего дня
+function createWorkDayRecord(employeeId, dateStr, workStartTime, workEndTime, resolve, reject) {
+    const workStartDateTime = `${dateStr} ${workStartTime}:00`;
+    const workEndDateTime = `${dateStr} ${workEndTime}:00`;
+    
+    const query = `
+        INSERT OR IGNORE INTO work_days 
+        (employee_id, date, work_start_time, work_end_time, created_at, updated_at)
+        VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+    `;
+    
+    db.run(query, [employeeId, dateStr, workStartDateTime, workEndDateTime], function(err) {
+        if (err) {
+            console.error('Ошибка создания рабочего дня:', err);
+            reject(err);
+        } else {
+            console.log(`Рабочий день создан: Employee ${employeeId}, Date: ${dateStr}, Time: ${workStartTime}-${workEndTime}`);
+            resolve(this.lastID);
+        }
     });
 }
 
@@ -1041,11 +1063,92 @@ function getWorkDayStatus(workDay) {
     return 'Время соблюдено';
 }
 
+// Функция для автоматического создания рабочих дней
+function createWorkDaysForAllEmployees() {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    
+    // Проверяем, является ли сегодня рабочим днем
+    if (!isWorkingDay(todayStr)) {
+        console.log(`📅 ${todayStr} - выходной день, рабочие дни не создаются`);
+        return;
+    }
+    
+    console.log(`🕐 Создание рабочих дней для ${todayStr}...`);
+    
+    // Получаем всех сотрудников
+    db.all('SELECT id, default_work_start, default_work_end FROM employees', (err, employees) => {
+        if (err) {
+            console.error('Ошибка получения списка сотрудников:', err);
+            return;
+        }
+        
+        let createdCount = 0;
+        let existingCount = 0;
+        
+        employees.forEach((employee, index) => {
+            const workStartTime = employee.default_work_start || '10:00';
+            const workEndTime = employee.default_work_end || '19:00';
+            
+            // Проверяем, существует ли уже запись для этого сотрудника на сегодня
+            db.get(
+                'SELECT id FROM work_days WHERE employee_id = ? AND date = ?',
+                [employee.id, todayStr],
+                (err, existing) => {
+                    if (err) {
+                        console.error(`Ошибка проверки существующей записи для сотрудника ${employee.id}:`, err);
+                        return;
+                    }
+                    
+                    if (existing) {
+                        existingCount++;
+                        console.log(`👤 Сотрудник ${employee.id}: запись уже существует`);
+                    } else {
+                        // Создаем новую запись рабочего дня
+                        const workStartDateTime = `${todayStr} ${workStartTime}:00`;
+                        const workEndDateTime = `${todayStr} ${workEndTime}:00`;
+                        
+                        db.run(
+                            'INSERT INTO work_days (employee_id, date, work_start_time, work_end_time, created_at, updated_at) VALUES (?, ?, ?, ?, datetime("now"), datetime("now"))',
+                            [employee.id, todayStr, workStartDateTime, workEndDateTime],
+                            function(err) {
+                                if (err) {
+                                    console.error(`Ошибка создания рабочего дня для сотрудника ${employee.id}:`, err);
+                                } else {
+                                    createdCount++;
+                                    console.log(`✅ Создан рабочий день: Сотрудник ${employee.id}, ${todayStr}, ${workStartTime}-${workEndTime}`);
+                                }
+                                
+                                // Проверяем, обработаны ли все сотрудники
+                                if (index === employees.length - 1) {
+                                    console.log(`📊 Итого: создано ${createdCount} новых записей, ${existingCount} уже существовало`);
+                                }
+                            }
+                        );
+                    }
+                }
+            );
+        });
+    });
+}
+
+// Настройка cron job - каждый день в 00:00
+cron.schedule('0 0 * * *', () => {
+    console.log('⏰ Cron job: Создание рабочих дней на сегодня');
+    createWorkDaysForAllEmployees();
+}, {
+    timezone: "Europe/Moscow"
+});
+
 // Запуск сервера
 app.listen(PORT, () => {
     console.log(`🚀 Сервер запущен на порту ${PORT}`);
     console.log(`📊 Админ-панель: http://localhost:${PORT}`);
     console.log(`📱 API: http://localhost:${PORT}/api`);
+    console.log(`⏰ Cron job настроен: создание рабочих дней каждый день в 00:00`);
+    
+    // Создаем рабочие дни на сегодня при запуске (если это рабочий день)
+    createWorkDaysForAllEmployees();
 });
 
 // Graceful shutdown
