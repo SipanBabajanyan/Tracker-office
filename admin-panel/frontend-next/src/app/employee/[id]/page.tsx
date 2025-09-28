@@ -144,50 +144,44 @@ export default function EmployeeDetail() {
     }
   };
 
-  const handleUpdateTargetHours = async () => {
-    if (!employee || newTargetHours < 0 || newTargetHours > 24) return;
+  const handleUpdateWorkSettings = async () => {
+    if (!employee || newTargetHours < 0 || newTargetHours > 24 || !newWorkStart || !newWorkEnd) return;
 
     try {
-      const response = await fetch(`http://192.168.15.20:3000/api/employee/${employee.id}/target-hours`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ targetHours: newTargetHours }),
-      });
-
-      if (response.ok) {
-        setEditingTargetHours(false);
-        loadEmployeeData(); // Перезагружаем данные для обновления коэффициентов
-      }
-    } catch (error) {
-      console.error('Ошибка обновления целевых часов:', error);
-    }
-  };
-
-  const handleUpdateWorkSchedule = async () => {
-    if (!employee || !newWorkStart || !newWorkEnd) return;
-
-    try {
-      const response = await fetch(`http://192.168.15.20:3000/api/employee/${employee.id}/work-schedule`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          workStart: newWorkStart, 
-          workEnd: newWorkEnd 
+      // Обновляем оба параметра параллельно
+      const [targetHoursResponse, workScheduleResponse] = await Promise.all([
+        fetch(`http://192.168.15.20:3000/api/employee/${employee.id}/target-hours`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetHours: newTargetHours }),
         }),
-      });
+        fetch(`http://192.168.15.20:3000/api/employee/${employee.id}/work-schedule`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            workStart: newWorkStart, 
+            workEnd: newWorkEnd 
+          }),
+        })
+      ]);
 
-      if (response.ok) {
+      if (targetHoursResponse.ok && workScheduleResponse.ok) {
+        setEditingTargetHours(false);
         setEditingWorkSchedule(false);
         setWorkSchedule({ workStart: newWorkStart, workEnd: newWorkEnd });
         loadEmployeeData(); // Перезагружаем данные
       }
     } catch (error) {
-      console.error('Ошибка обновления рабочего расписания:', error);
+      console.error('Ошибка обновления настроек рабочего времени:', error);
     }
+  };
+
+  const handleCancelEditing = () => {
+    setEditingTargetHours(false);
+    setEditingWorkSchedule(false);
+    setNewTargetHours(coefficients?.targetHours || 8);
+    setNewWorkStart(workSchedule.workStart);
+    setNewWorkEnd(workSchedule.workEnd);
   };
 
   const formatDate = (dateStr: string) => {
@@ -472,70 +466,79 @@ export default function EmployeeDetail() {
           </div>
         )}
 
-        {/* Target Hours Settings */}
+        {/* Work Time Settings */}
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-6 mb-8">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">🎯 Настройки целевых часов</h3>
-              <p className="text-gray-600">Установите количество часов, которое сотрудник должен проводить в офисе ежедневно</p>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">⏰ Настройки рабочего времени</h3>
+              <p className="text-gray-600">Установите рабочее расписание и целевые часы для сотрудника</p>
             </div>
             
             <div className="flex items-center space-x-4">
+              {(editingTargetHours || editingWorkSchedule) ? (
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={handleUpdateWorkSettings}
+                    className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors"
+                  >
+                    ✓ Сохранить
+                  </button>
+                  <button
+                    onClick={handleCancelEditing}
+                    className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
+                  >
+                    ✕ Отмена
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setEditingTargetHours(true);
+                    setEditingWorkSchedule(true);
+                  }}
+                  className="text-blue-500 hover:text-blue-600 transition-colors"
+                >
+                  ✏️ Редактировать
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Target Hours */}
+            <div className="bg-gray-50 rounded-xl p-4">
+              <h4 className="text-lg font-semibold text-gray-900 mb-3">🎯 Целевые часы</h4>
+              <p className="text-sm text-gray-600 mb-3">Количество часов в офисе ежедневно</p>
+              
               {editingTargetHours ? (
                 <div className="flex items-center space-x-3">
                   <input
                     type="number"
                     min="0"
                     max="24"
+                    step="0.5"
                     value={newTargetHours}
                     onChange={(e) => setNewTargetHours(Number(e.target.value))}
-                    className="w-20 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <span className="text-gray-600">часов</span>
-                  <button
-                    onClick={handleUpdateTargetHours}
-                    className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors"
-                  >
-                    ✓
-                  </button>
-                  <button
-                    onClick={() => {
-                      setEditingTargetHours(false);
-                      setNewTargetHours(coefficients?.targetHours || 8);
-                    }}
-                    className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
-                  >
-                    ✕
-                  </button>
                 </div>
               ) : (
-                <div className="flex items-center space-x-3">
-                  <span className="text-2xl font-bold text-gray-900">{coefficients?.targetHours || 8} часов</span>
-                  <button
-                    onClick={() => setEditingTargetHours(true)}
-                    className="text-blue-500 hover:text-blue-600 transition-colors"
-                  >
-                    ✏️
-                  </button>
+                <div className="text-2xl font-bold text-gray-900">
+                  {coefficients?.targetHours || 8} часов
                 </div>
               )}
             </div>
-          </div>
-        </div>
 
-        {/* Work Schedule Settings */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-6 mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">⏰ Рабочее расписание</h3>
-              <p className="text-gray-600">Установите время начала и окончания рабочего дня для контроля опозданий</p>
-            </div>
-            
-            <div className="flex items-center space-x-4">
+            {/* Work Schedule */}
+            <div className="bg-gray-50 rounded-xl p-4">
+              <h4 className="text-lg font-semibold text-gray-900 mb-3">🕐 Рабочее расписание</h4>
+              <p className="text-sm text-gray-600 mb-3">Время начала и окончания рабочего дня</p>
+              
               {editingWorkSchedule ? (
-                <div className="flex items-center space-x-3">
-                  <div className="flex items-center space-x-2">
-                    <label className="text-sm text-gray-600">Начало:</label>
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-3">
+                    <label className="text-sm text-gray-600 w-16">Начало:</label>
                     <input
                       type="time"
                       value={newWorkStart}
@@ -543,8 +546,8 @@ export default function EmployeeDetail() {
                       className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <label className="text-sm text-gray-600">Конец:</label>
+                  <div className="flex items-center space-x-3">
+                    <label className="text-sm text-gray-600 w-16">Конец:</label>
                     <input
                       type="time"
                       value={newWorkEnd}
@@ -552,34 +555,10 @@ export default function EmployeeDetail() {
                       className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
-                  <button
-                    onClick={handleUpdateWorkSchedule}
-                    className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors"
-                  >
-                    ✓
-                  </button>
-                  <button
-                    onClick={() => {
-                      setEditingWorkSchedule(false);
-                      setNewWorkStart(workSchedule.workStart);
-                      setNewWorkEnd(workSchedule.workEnd);
-                    }}
-                    className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
-                  >
-                    ✕
-                  </button>
                 </div>
               ) : (
-                <div className="flex items-center space-x-3">
-                  <span className="text-lg font-bold text-gray-900">
-                    {workSchedule.workStart} - {workSchedule.workEnd}
-                  </span>
-                  <button
-                    onClick={() => setEditingWorkSchedule(true)}
-                    className="text-blue-500 hover:text-blue-600 transition-colors"
-                  >
-                    ✏️
-                  </button>
+                <div className="text-lg font-bold text-gray-900">
+                  {workSchedule.workStart} - {workSchedule.workEnd}
                 </div>
               )}
             </div>
