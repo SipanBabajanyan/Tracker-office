@@ -31,12 +31,29 @@ export default function DayDetailPage() {
   const date = params.date as string;
   
   const [dayData, setDayData] = useState<DayData | null>(null);
+  const [employeeName, setEmployeeName] = useState<string>('Загрузка...');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    loadEmployeeName();
     loadDayData();
   }, [employeeId, date]);
+
+  const loadEmployeeName = async () => {
+    try {
+      const response = await fetch(`http://192.168.15.20:3000/api/employees`);
+      if (response.ok) {
+        const employees = await response.json();
+        const employee = employees.find((emp: any) => emp.id === parseInt(employeeId));
+        if (employee) {
+          setEmployeeName(employee.name);
+        }
+      }
+    } catch (err) {
+      console.error('Ошибка загрузки имени сотрудника:', err);
+    }
+  };
 
   const loadDayData = async () => {
     try {
@@ -128,7 +145,7 @@ export default function DayDetailPage() {
             
             <div className="text-center">
               <h1 className="text-2xl font-bold text-gray-900">
-                Детальная история дня
+                {employeeName}
               </h1>
             </div>
             
@@ -137,32 +154,36 @@ export default function DayDetailPage() {
         </div>
       </div>
 
-      {/* Date Navigation - отдельный блок */}
-      <div className="bg-white/80 backdrop-blur-md shadow-lg border-b border-white/20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-6">
-            <button
-              onClick={() => navigateToDay(getPreviousDay())}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Предыдущий день
-            </button>
-            
+      {/* Hero Section - центральный блок с датой */}
+      <div className="py-12">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 flex items-center justify-center">
-                <Calendar className="h-6 w-6 mr-3 text-blue-600" />
+              <h2 className="text-3xl font-bold text-gray-900 flex items-center justify-center mb-4">
+                <Calendar className="h-8 w-8 mr-4 text-blue-600" />
                 {formatDate(dayData.date)}
               </h2>
+              <p className="text-lg text-gray-600 mb-8">Детальная история дня</p>
+              
+              {/* Navigation buttons */}
+              <div className="flex justify-center space-x-4">
+                <button
+                  onClick={() => navigateToDay(getPreviousDay())}
+                  className="inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-300 shadow-lg hover:shadow-xl"
+                >
+                  <ArrowLeft className="h-5 w-5 mr-2" />
+                  Предыдущий день
+                </button>
+                
+                <button
+                  onClick={() => navigateToDay(getNextDay())}
+                  className="inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-300 shadow-lg hover:shadow-xl"
+                >
+                  Следующий день
+                  <ArrowLeft className="h-5 w-5 ml-2 rotate-180" />
+                </button>
+              </div>
             </div>
-            
-            <button
-              onClick={() => navigateToDay(getNextDay())}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-            >
-              Следующий день
-              <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
-            </button>
           </div>
         </div>
       </div>
