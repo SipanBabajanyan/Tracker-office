@@ -278,6 +278,32 @@ app.post('/api/employee/:id/session', async (req, res) => {
             }
         });
 
+        // Создаем запись в office_sessions для истории сессий
+        if (totalMinutes > 0) {
+            const sessionQuery = `
+                INSERT INTO office_sessions (employee_id, start_time, end_time, is_active)
+                VALUES (?, ?, ?, ?)
+            `;
+            
+            // Рассчитываем время начала и окончания на основе totalMinutes
+            const now = new Date();
+            const startTime = new Date(now.getTime() - totalMinutes * 60 * 1000);
+            const endTime = isInOffice ? null : now;
+            
+            db.run(sessionQuery, [
+                employeeId, 
+                startTime.toISOString(), 
+                endTime ? endTime.toISOString() : null, 
+                isInOffice ? 1 : 0
+            ], function(err) {
+                if (err) {
+                    console.error('Ошибка создания записи сессии:', err);
+                } else {
+                    console.log(`Запись сессии создана: Employee ${employeeId}, Start: ${startTime.toISOString()}, End: ${endTime ? endTime.toISOString() : 'null'}`);
+                }
+            });
+        }
+
         function updateEmployeeStatus() {
             // Обновляем статус сотрудника
             const updateEmployeeQuery = `
@@ -757,6 +783,8 @@ app.get('/api/employee/:id/sessions', (req, res) => {
             CASE 
                 WHEN end_time IS NOT NULL THEN 
                     ROUND((julianday(end_time) - julianday(start_time)) * 24 * 60)
+                WHEN is_active = 1 THEN 
+                    ROUND((julianday('now') - julianday(start_time)) * 24 * 60)
                 ELSE 0
             END as total_minutes
         FROM office_sessions 
