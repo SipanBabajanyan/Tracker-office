@@ -24,8 +24,8 @@ class TimerBackgroundService {
       // Сразу проверяем текущее состояние
       await _checkOfficeStatus();
       
-      // Запускаем периодическую проверку каждые 2 минуты
-      _backgroundTimer = Timer.periodic(const Duration(minutes: 2), (timer) async {
+      // Запускаем периодическую проверку каждую минуту
+      _backgroundTimer = Timer.periodic(const Duration(minutes: 1), (timer) async {
         await _checkOfficeStatus();
       });
       

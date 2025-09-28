@@ -37,8 +37,8 @@ class TrackingService {
     // Сразу проверяем текущее состояние
     await _checkOfficeStatus();
     
-    // Запускаем периодическую проверку каждые 2 минуты
-    _checkTimer = Timer.periodic(const Duration(minutes: 2), (timer) {
+    // Запускаем периодическую проверку каждую минуту
+    _checkTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
       _checkOfficeStatus();
     });
     
