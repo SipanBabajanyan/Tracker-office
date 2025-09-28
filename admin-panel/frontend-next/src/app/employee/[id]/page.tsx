@@ -467,27 +467,26 @@ export default function EmployeeDetail() {
         )}
 
         {/* Work Time Settings */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-6 mb-8">
-          <div className="flex items-center justify-between mb-6">
+        <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-white/20 p-4 mb-6">
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">⏰ Настройки рабочего времени</h3>
-              <p className="text-gray-600">Установите рабочее расписание и целевые часы для сотрудника</p>
+              <h3 className="text-lg font-bold text-gray-900">⏰ Настройки рабочего времени</h3>
             </div>
             
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
               {(editingTargetHours || editingWorkSchedule) ? (
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2">
                   <button
                     onClick={handleUpdateWorkSettings}
-                    className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors"
+                    className="bg-green-500 text-white px-3 py-1.5 rounded-md hover:bg-green-600 transition-colors text-sm"
                   >
-                    ✓ Сохранить
+                    ✓
                   </button>
                   <button
                     onClick={handleCancelEditing}
-                    className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
+                    className="bg-gray-500 text-white px-3 py-1.5 rounded-md hover:bg-gray-600 transition-colors text-sm"
                   >
-                    ✕ Отмена
+                    ✕
                   </button>
                 </div>
               ) : (
@@ -496,22 +495,23 @@ export default function EmployeeDetail() {
                     setEditingTargetHours(true);
                     setEditingWorkSchedule(true);
                   }}
-                  className="text-blue-500 hover:text-blue-600 transition-colors"
+                  className="text-blue-500 hover:text-blue-600 transition-colors text-sm"
                 >
-                  ✏️ Редактировать
+                  ✏️
                 </button>
               )}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Target Hours */}
-            <div className="bg-gray-50 rounded-xl p-4">
-              <h4 className="text-lg font-semibold text-gray-900 mb-3">🎯 Целевые часы</h4>
-              <p className="text-sm text-gray-600 mb-3">Количество часов в офисе ежедневно</p>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-semibold text-gray-900">🎯 Целевые часы</h4>
+              </div>
               
               {editingTargetHours ? (
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2">
                   <input
                     type="number"
                     min="0"
@@ -519,45 +519,46 @@ export default function EmployeeDetail() {
                     step="0.5"
                     value={newTargetHours}
                     onChange={(e) => setNewTargetHours(Number(e.target.value))}
-                    className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-20 px-2 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
                   />
-                  <span className="text-gray-600">часов</span>
+                  <span className="text-gray-600 text-sm">ч</span>
                 </div>
               ) : (
-                <div className="text-2xl font-bold text-gray-900">
-                  {coefficients?.targetHours || 8} часов
+                <div className="text-lg font-bold text-gray-900">
+                  {coefficients?.targetHours || 8}ч
                 </div>
               )}
             </div>
 
             {/* Work Schedule */}
-            <div className="bg-gray-50 rounded-xl p-4">
-              <h4 className="text-lg font-semibold text-gray-900 mb-3">🕐 Рабочее расписание</h4>
-              <p className="text-sm text-gray-600 mb-3">Время начала и окончания рабочего дня</p>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-semibold text-gray-900">🕐 Рабочее время</h4>
+              </div>
               
               {editingWorkSchedule ? (
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-3">
-                    <label className="text-sm text-gray-600 w-16">Начало:</label>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <label className="text-xs text-gray-600 w-12">Начало:</label>
                     <input
                       type="time"
                       value={newWorkStart}
                       onChange={(e) => setNewWorkStart(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="px-2 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
                     />
                   </div>
-                  <div className="flex items-center space-x-3">
-                    <label className="text-sm text-gray-600 w-16">Конец:</label>
+                  <div className="flex items-center space-x-2">
+                    <label className="text-xs text-gray-600 w-12">Конец:</label>
                     <input
                       type="time"
                       value={newWorkEnd}
                       onChange={(e) => setNewWorkEnd(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="px-2 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
                     />
                   </div>
                 </div>
               ) : (
-                <div className="text-lg font-bold text-gray-900">
+                <div className="text-sm font-bold text-gray-900">
                   {workSchedule.workStart} - {workSchedule.workEnd}
                 </div>
               )}
