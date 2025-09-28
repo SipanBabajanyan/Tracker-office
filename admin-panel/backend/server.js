@@ -33,8 +33,6 @@ db.serialize(() => {
         target_hours_per_day INTEGER DEFAULT 8,
         is_in_office BOOLEAN DEFAULT 0,
         last_seen DATETIME,
-        default_work_start TEXT DEFAULT '10:00',
-        default_work_end TEXT DEFAULT '19:00',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
     
@@ -47,16 +45,6 @@ db.serialize(() => {
     db.run(`ALTER TABLE employees ADD COLUMN last_seen DATETIME`, (err) => {
         if (err && !err.message.includes('duplicate column name')) {
             console.error('Ошибка добавления колонки last_seen:', err);
-        }
-    });
-    db.run(`ALTER TABLE employees ADD COLUMN default_work_start TEXT DEFAULT '10:00'`, (err) => {
-        if (err && !err.message.includes('duplicate column name')) {
-            console.error('Ошибка добавления колонки default_work_start:', err);
-        }
-    });
-    db.run(`ALTER TABLE employees ADD COLUMN default_work_end TEXT DEFAULT '19:00'`, (err) => {
-        if (err && !err.message.includes('duplicate column name')) {
-            console.error('Ошибка добавления колонки default_work_end:', err);
         }
     });
 
@@ -244,8 +232,9 @@ app.post('/api/employee/:id/session', async (req, res) => {
     }
 
     try {
-        // Создаем запись рабочего дня для любого дня, когда сотрудник работает
-        if (totalMinutes > 0) {
+        // Проверяем, является ли день рабочим
+        if (isWorkingDay(date)) {
+            // Создаем запись рабочего дня, если её нет
             await createWorkDay(employeeId, date);
             
             // Обновляем фактическое время прихода/ухода
@@ -457,48 +446,26 @@ function isWorkingDay(dateStr) {
 }
 
 // Функция для создания записи рабочего дня
-function createWorkDay(employeeId, dateStr, workStartTime = null, workEndTime = null) {
+function createWorkDay(employeeId, dateStr, workStartTime = '09:00', workEndTime = '18:00') {
     return new Promise((resolve, reject) => {
-        // Если время не указано, получаем индивидуальное время сотрудника
-        if (!workStartTime || !workEndTime) {
-            const query = 'SELECT default_work_start, default_work_end FROM employees WHERE id = ?';
-            db.get(query, [employeeId], (err, employee) => {
-                if (err) {
-                    console.error('Ошибка получения рабочего времени сотрудника:', err);
-                    reject(err);
-                    return;
-                }
-                
-                const startTime = workStartTime || employee?.default_work_start || '10:00';
-                const endTime = workEndTime || employee?.default_work_end || '19:00';
-                
-                createWorkDayRecord(employeeId, dateStr, startTime, endTime, resolve, reject);
-            });
-        } else {
-            createWorkDayRecord(employeeId, dateStr, workStartTime, workEndTime, resolve, reject);
-        }
-    });
-}
-
-// Вспомогательная функция для создания записи рабочего дня
-function createWorkDayRecord(employeeId, dateStr, workStartTime, workEndTime, resolve, reject) {
-    const workStartDateTime = `${dateStr} ${workStartTime}:00`;
-    const workEndDateTime = `${dateStr} ${workEndTime}:00`;
-    
-    const query = `
-        INSERT OR IGNORE INTO work_days 
-        (employee_id, date, work_start_time, work_end_time, created_at, updated_at)
-        VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
-    `;
-    
-    db.run(query, [employeeId, dateStr, workStartDateTime, workEndDateTime], function(err) {
-        if (err) {
-            console.error('Ошибка создания рабочего дня:', err);
-            reject(err);
-        } else {
-            console.log(`Рабочий день создан: Employee ${employeeId}, Date: ${dateStr}, Time: ${workStartTime}-${workEndTime}`);
-            resolve(this.lastID);
-        }
+        const workStartDateTime = `${dateStr} ${workStartTime}:00`;
+        const workEndDateTime = `${dateStr} ${workEndTime}:00`;
+        
+        const query = `
+            INSERT OR IGNORE INTO work_days 
+            (employee_id, date, work_start_time, work_end_time, created_at, updated_at)
+            VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+        `;
+        
+        db.run(query, [employeeId, dateStr, workStartDateTime, workEndDateTime], function(err) {
+            if (err) {
+                console.error('Ошибка создания рабочего дня:', err);
+                reject(err);
+            } else {
+                console.log(`Рабочий день создан: Employee ${employeeId}, Date: ${dateStr}`);
+                resolve(this.lastID);
+            }
+        });
     });
 }
 
@@ -654,19 +621,6 @@ function calculateCoefficient(totalMinutes, targetHoursPerDay, dateStr) {
     }
 }
 
-// Функция расчета коэффициента для аналитики (упрощенная)
-function calculateAnalyticsCoefficient(totalMinutes, targetHoursPerDay, dateStr) {
-    const targetMinutes = targetHoursPerDay * 60;
-    
-    if (isWorkingDay(dateStr)) {
-        // Рабочие дни: обычный расчет
-        return targetMinutes > 0 ? (totalMinutes / targetMinutes * 100) : 0;
-    } else {
-        // Нерабочие дни: 100% если есть работа, 0% если нет
-        return totalMinutes > 0 ? 100 : 0;
-    }
-}
-
         // Получить историю сотрудника
         app.get('/api/employee/:id/history', (req, res) => {
             const employeeId = req.params.id;
@@ -814,8 +768,8 @@ function calculateAnalyticsCoefficient(totalMinutes, targetHoursPerDay, dateStr)
                     weekendDaysCount++;
                 }
                 
-                // Добавляем коэффициент дня (для аналитики используем упрощенную версию)
-                const dayCoefficient = calculateAnalyticsCoefficient(parseFloat(row.total_minutes) || 0, targetHoursPerDay, row.date);
+                // Добавляем коэффициент дня
+                const dayCoefficient = calculateCoefficient(parseFloat(row.total_minutes) || 0, targetHoursPerDay, row.date);
                 totalCoefficient += dayCoefficient;
             }
         });
@@ -823,10 +777,6 @@ function calculateAnalyticsCoefficient(totalMinutes, targetHoursPerDay, dateStr)
         const avgMinutes = rows.length > 0 ? totalMinutes / rows.length : 0;
         const avgCoefficient = rows.length > 0 ? totalCoefficient / rows.length : 0;
         const totalTimeDiff = Math.round(totalMinutes - totalTargetMinutes);
-        
-        // Рассчитываем среднюю разницу времени только по рабочим дням
-        const avgMinutesWorkingDays = workingDaysCount > 0 ? totalMinutes / workingDaysCount : 0;
-        const avgTimeDiff = workingDaysCount > 0 ? Math.round(avgMinutesWorkingDays - targetMinutes) : 0;
         
         res.json({
             targetHours: targetHoursPerDay,
@@ -839,7 +789,7 @@ function calculateAnalyticsCoefficient(totalMinutes, targetHoursPerDay, dateStr)
             weekendDaysCount: weekendDaysCount,
             avgCoefficient: Math.round(avgCoefficient),
             totalCoefficient: Math.round(totalCoefficient),
-            avgTimeDiff: avgTimeDiff, // Средняя разница времени только по рабочим дням
+            avgTimeDiff: Math.round(avgMinutes - targetMinutes),
             totalTimeDiff: totalTimeDiff // Разница времени за весь период
         });
     });
@@ -1079,58 +1029,6 @@ app.put('/api/employee/:id/work-day/:date', (req, res) => {
         }
         
         res.json({ message: 'Рабочий день обновлен' });
-    });
-});
-
-// Получить/установить рабочее время по умолчанию для сотрудника
-app.get('/api/employee/:id/work-schedule', (req, res) => {
-    const employeeId = req.params.id;
-    
-    const query = 'SELECT default_work_start, default_work_end FROM employees WHERE id = ?';
-    db.get(query, [employeeId], (err, row) => {
-        if (err) {
-            console.error('Ошибка получения рабочего расписания:', err);
-            return res.status(500).json({ error: 'Ошибка базы данных' });
-        }
-        
-        if (!row) {
-            return res.status(404).json({ error: 'Сотрудник не найден' });
-        }
-        
-        res.json({
-            workStart: row.default_work_start || '10:00',
-            workEnd: row.default_work_end || '19:00'
-        });
-    });
-});
-
-// Обновить рабочее время по умолчанию для сотрудника
-app.put('/api/employee/:id/work-schedule', (req, res) => {
-    const employeeId = req.params.id;
-    const { workStart, workEnd } = req.body;
-    
-    if (!workStart || !workEnd) {
-        return res.status(400).json({ error: 'Время начала и конца работы обязательно' });
-    }
-    
-    // Проверяем формат времени (HH:MM)
-    const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
-    if (!timeRegex.test(workStart) || !timeRegex.test(workEnd)) {
-        return res.status(400).json({ error: 'Неверный формат времени. Используйте HH:MM' });
-    }
-    
-    const query = 'UPDATE employees SET default_work_start = ?, default_work_end = ? WHERE id = ?';
-    db.run(query, [workStart, workEnd, employeeId], function(err) {
-        if (err) {
-            console.error('Ошибка обновления рабочего расписания:', err);
-            return res.status(500).json({ error: 'Ошибка базы данных' });
-        }
-        
-        if (this.changes === 0) {
-            return res.status(404).json({ error: 'Сотрудник не найден' });
-        }
-        
-        res.json({ message: 'Рабочее расписание обновлено', workStart, workEnd });
     });
 });
 
