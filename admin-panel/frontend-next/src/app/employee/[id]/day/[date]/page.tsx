@@ -154,35 +154,36 @@ export default function DayDetailPage() {
         </div>
       </div>
 
-      {/* Hero Section - центральный блок с датой */}
-      <div className="py-12">
+      {/* Hero Section - компактный блок с датой */}
+      <div className="py-6">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8">
-            <div className="text-center">
-              <h2 className="text-3xl font-bold text-gray-900 flex items-center justify-center mb-4">
-                <Calendar className="h-8 w-8 mr-4 text-blue-600" />
-                {formatDate(dayData.date)}
-              </h2>
-              <p className="text-lg text-gray-600 mb-8">Детальная история дня</p>
+          <div className="bg-white/90 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-6">
+            <div className="flex items-center justify-between">
+              {/* Left navigation */}
+              <button
+                onClick={() => navigateToDay(getPreviousDay())}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-300"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Предыдущий
+              </button>
               
-              {/* Navigation buttons */}
-              <div className="flex justify-center space-x-4">
-                <button
-                  onClick={() => navigateToDay(getPreviousDay())}
-                  className="inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-300 shadow-lg hover:shadow-xl"
-                >
-                  <ArrowLeft className="h-5 w-5 mr-2" />
-                  Предыдущий день
-                </button>
-                
-                <button
-                  onClick={() => navigateToDay(getNextDay())}
-                  className="inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-xl text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-300 shadow-lg hover:shadow-xl"
-                >
-                  Следующий день
-                  <ArrowLeft className="h-5 w-5 ml-2 rotate-180" />
-                </button>
+              {/* Center date */}
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-gray-900 flex items-center justify-center">
+                  <Calendar className="h-6 w-6 mr-3 text-blue-600" />
+                  {formatDate(dayData.date)}
+                </h2>
               </div>
+              
+              {/* Right navigation */}
+              <button
+                onClick={() => navigateToDay(getNextDay())}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-300"
+              >
+                Следующий
+                <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
+              </button>
             </div>
           </div>
         </div>
