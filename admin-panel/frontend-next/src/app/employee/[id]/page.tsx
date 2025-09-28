@@ -174,6 +174,16 @@ export default function EmployeeDetail() {
     return `${hours}ч ${mins}м`;
   };
 
+  const formatTimeDiff = (minutes: number) => {
+    if (isNaN(minutes) || minutes === undefined || minutes === null) {
+      return '0:00';
+    }
+    const hours = Math.floor(Math.abs(minutes) / 60);
+    const mins = Math.abs(minutes) % 60;
+    const sign = minutes < 0 ? '-' : '+';
+    return `${sign}${hours}:${mins.toString().padStart(2, '0')}`;
+  };
+
   // Пагинация
   const getPaginatedHistory = () => {
     if (!Array.isArray(history)) return [];
@@ -362,8 +372,9 @@ export default function EmployeeDetail() {
                 <div>
                   <p className="text-gray-600 text-sm font-medium mb-2">Коэффициент</p>
                   <p className={`text-3xl font-bold ${
-                    coefficients.avgCoefficient >= 80 ? 'text-green-600' : 
-                    coefficients.avgCoefficient >= 50 ? 'text-orange-600' : 'text-red-600'
+                    coefficients.avgCoefficient >= 120 ? 'text-green-800' :
+                    coefficients.avgCoefficient >= 100 ? 'text-green-600' : 
+                    coefficients.avgCoefficient >= 90 ? 'text-orange-600' : 'text-red-600'
                   }`}>
                     {coefficients.avgCoefficient}%
                   </p>
@@ -459,127 +470,133 @@ export default function EmployeeDetail() {
           </div>
         </div>
 
-        {/* History Table */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden">
-          <div className="px-8 py-6 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-            <h3 className="text-xl font-bold text-gray-900 flex items-center">
-              <Activity className="h-6 w-6 mr-3 text-blue-600" />
-              История активности
-            </h3>
-          </div>
-          
-                  <div className="divide-y divide-gray-100">
-                    {history.length === 0 ? (
-                      <div className="p-8 text-center text-gray-500">
-                        <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                        <p>Нет данных за выбранный период</p>
+                {/* History Table */}
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 overflow-hidden">
+                  <div className="px-8 py-6 bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+                    <h3 className="text-xl font-bold text-gray-900 flex items-center">
+                      <Activity className="h-6 w-6 mr-3 text-blue-600" />
+                      История активности
+                    </h3>
+                  </div>
+                  
+                  {history.length === 0 ? (
+                    <div className="p-8 text-center text-gray-500">
+                      <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                      <p>Нет данных за выбранный период</p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Table Header */}
+                      <div className="bg-gray-50 px-8 py-4 border-b border-gray-200">
+                        <div className="grid grid-cols-5 gap-0 text-sm font-semibold text-gray-700">
+                          <div>Дата</div>
+                          <div className="text-right">Время</div>
+                          <div className="text-right">Коэффициент</div>
+                          <div className="text-right">Разница</div>
+                          <div className="text-right">Статус</div>
+                        </div>
                       </div>
-                    ) : (
-                      <>
+                      
+                      {/* Table Body */}
+                      <div className="divide-y divide-gray-100">
                         {getPaginatedHistory().map((day, index) => (
-                          <div key={index} className="p-6 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-300">
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <h4 className="text-lg font-semibold text-gray-900">
+                          <div key={index} className="px-8 py-4 hover:bg-gray-50 transition-colors">
+                            <div className="grid grid-cols-5 gap-0 items-center">
+                              {/* Дата */}
+                              <div>
+                                <div className="font-semibold text-gray-900">
                                   {formatDate(day.date)}
-                                </h4>
-                                <p className="text-sm text-gray-600">
+                                </div>
+                                <div className="text-sm text-gray-500">
                                   {day.date}
-                                </p>
+                                </div>
                               </div>
                               
+                              {/* Время (справа) */}
                               <div className="text-right">
-                                <div className="flex items-center space-x-4">
-                                  <div className="text-center">
-                                    <div className="text-2xl font-bold text-green-600 mb-1">
-                                      {day.time}
-                                    </div>
-                                    <div className="text-sm text-gray-500">
-                                      из {day.targetTime}
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="text-center">
-                                    <div className={`text-2xl font-bold mb-1 ${
-                                      day.coefficient >= 100 ? 'text-green-600' : 
-                                      day.coefficient >= 80 ? 'text-yellow-600' : 'text-red-600'
-                                    }`}>
-                                      {day.coefficient}%
-                                    </div>
-                                    <div className="text-sm text-gray-500">
-                                      коэффициент
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="text-center">
-                                    <div className={`text-lg font-bold mb-1 ${
-                                      day.timeDiffMinutes >= 0 ? 'text-green-600' : 'text-red-600'
-                                    }`}>
-                                      {day.timeDiff}
-                                    </div>
-                                    <div className="text-sm text-gray-500">
-                                      разница
-                                    </div>
-                                  </div>
-                                  
-                                  <div className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${
-                                    day.status === 'В офисе'
-                                      ? 'bg-green-100 text-green-800'
-                                      : 'bg-red-100 text-red-800'
-                                  }`}>
-                                    {day.status}
-                                  </div>
+                                <div className="text-lg font-bold text-gray-900">
+                                  {day.time}
                                 </div>
+                                <div className="text-sm text-gray-500">
+                                  из {day.targetTime}
+                                </div>
+                              </div>
+                              
+                              {/* Коэффициент (справа) */}
+                              <div className={`text-lg font-bold text-right ${
+                                day.coefficient >= 120 ? 'text-green-800' :
+                                day.coefficient >= 100 ? 'text-green-600' : 
+                                day.coefficient >= 90 ? 'text-orange-600' : 'text-red-600'
+                              }`}>
+                                {day.coefficient}%
+                              </div>
+                              
+                              {/* Разница (справа) */}
+                              <div className={`text-lg font-bold text-right ${
+                                day.timeDiffMinutes >= 0 ? 'text-green-600' : 'text-red-600'
+                              }`}>
+                                {formatTimeDiff(day.timeDiffMinutes)}
+                              </div>
+                              
+                              {/* Статус (справа) */}
+                              <div className="text-right">
+                                <span className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${
+                                  day.status === 'В офисе'
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {day.status}
+                                </span>
                               </div>
                             </div>
                           </div>
                         ))}
-                        
-                        {/* Пагинация */}
-                        {getTotalPages() > 1 && (
-                          <div className="p-6 bg-gray-50 border-t border-gray-200">
-                            <div className="flex items-center justify-between">
-                              <div className="text-sm text-gray-600">
-                                Показано {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, history.length)} из {history.length} записей
-                              </div>
-                              <div className="flex space-x-2">
+                      </div>
+                      
+                      {/* Пагинация */}
+                      {getTotalPages() > 1 && (
+                        <div className="p-6 bg-gray-50 border-t border-gray-200">
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm text-gray-600">
+                              Показано {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, history.length)} из {history.length} записей
+                            </div>
+                            <div className="flex space-x-2">
+                              <button
+                                onClick={() => handlePageChange(currentPage - 1)}
+                                disabled={currentPage === 1}
+                                className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                ← Назад
+                              </button>
+                              
+                              {Array.from({ length: getTotalPages() }, (_, i) => i + 1).map((page) => (
                                 <button
-                                  onClick={() => handlePageChange(currentPage - 1)}
-                                  disabled={currentPage === 1}
-                                  className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  key={page}
+                                  onClick={() => handlePageChange(page)}
+                                  className={`px-3 py-2 text-sm font-medium rounded-lg ${
+                                    currentPage === page
+                                      ? 'bg-blue-500 text-white'
+                                      : 'text-gray-500 bg-white border border-gray-300 hover:bg-gray-50'
+                                  }`}
                                 >
-                                  ← Назад
+                                  {page}
                                 </button>
-                                
-                                {Array.from({ length: getTotalPages() }, (_, i) => i + 1).map((page) => (
-                                  <button
-                                    key={page}
-                                    onClick={() => handlePageChange(page)}
-                                    className={`px-3 py-2 text-sm font-medium rounded-lg ${
-                                      currentPage === page
-                                        ? 'bg-blue-500 text-white'
-                                        : 'text-gray-500 bg-white border border-gray-300 hover:bg-gray-50'
-                                    }`}
-                                  >
-                                    {page}
-                                  </button>
-                                ))}
-                                
-                                <button
-                                  onClick={() => handlePageChange(currentPage + 1)}
-                                  disabled={currentPage === getTotalPages()}
-                                  className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                  Вперед →
-                                </button>
-                              </div>
+                              ))}
+                              
+                              <button
+                                onClick={() => handlePageChange(currentPage + 1)}
+                                disabled={currentPage === getTotalPages()}
+                                className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                Вперед →
+                              </button>
                             </div>
                           </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-        </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
       </div>
     </div>
   );
