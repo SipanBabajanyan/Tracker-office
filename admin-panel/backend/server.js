@@ -68,7 +68,8 @@ db.serialize(() => {
         sessions_count INTEGER DEFAULT 0,
         is_in_office BOOLEAN DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (employee_id) REFERENCES employees (id)
+        FOREIGN KEY (employee_id) REFERENCES employees (id),
+        UNIQUE(employee_id, date)
     )`);
     
     // Добавляем поле is_in_office если его нет (игнорируем ошибки если колонка уже существует)
@@ -77,6 +78,8 @@ db.serialize(() => {
             console.error('Ошибка добавления колонки is_in_office в daily_stats:', err);
         }
     });
+    
+    // Уникальный индекс не нужен - используем программную логику для предотвращения дублирования
 });
 
 // API Routes
@@ -206,18 +209,43 @@ app.post('/api/employee/:id/session', (req, res) => {
         return res.status(400).json({ error: 'Неверные данные' });
     }
 
-    // Обновляем или создаем запись в daily_stats
-    const query = `
-        INSERT OR REPLACE INTO daily_stats (employee_id, date, total_minutes, is_in_office)
-        VALUES (?, ?, ?, ?)
+    // Сначала пытаемся обновить существующую запись
+    const updateQuery = `
+        UPDATE daily_stats 
+        SET total_minutes = ?, is_in_office = ?
+        WHERE employee_id = ? AND date = ?
     `;
     
-    db.run(query, [employeeId, date, totalMinutes, isInOffice ? 1 : 0], function(err) {
+    db.run(updateQuery, [totalMinutes, isInOffice ? 1 : 0, employeeId, date], function(err) {
         if (err) {
-            console.error('Ошибка сохранения сессии:', err);
+            console.error('Ошибка обновления сессии:', err);
             return res.status(500).json({ error: 'Ошибка базы данных' });
         }
+        
+        if (this.changes > 0) {
+            // Запись обновлена
+            console.log(`Сессия обновлена: Employee ${employeeId}, Date: ${date}, Minutes: ${totalMinutes}, InOffice: ${isInOffice}`);
+            updateEmployeeStatus();
+        } else {
+            // Записи нет, создаем новую
+            const insertQuery = `
+                INSERT INTO daily_stats (employee_id, date, total_minutes, is_in_office)
+                VALUES (?, ?, ?, ?)
+            `;
+            
+            db.run(insertQuery, [employeeId, date, totalMinutes, isInOffice ? 1 : 0], function(err) {
+                if (err) {
+                    console.error('Ошибка создания сессии:', err);
+                    return res.status(500).json({ error: 'Ошибка базы данных' });
+                }
+                
+                console.log(`Сессия создана: Employee ${employeeId}, Date: ${date}, Minutes: ${totalMinutes}, InOffice: ${isInOffice}`);
+                updateEmployeeStatus();
+            });
+        }
+    });
 
+    function updateEmployeeStatus() {
         // Обновляем статус сотрудника
         const updateEmployeeQuery = `
             UPDATE employees 
@@ -231,10 +259,9 @@ app.post('/api/employee/:id/session', (req, res) => {
                 return res.status(500).json({ error: 'Ошибка базы данных' });
             }
 
-            console.log(`Сессия сохранена: Employee ${employeeId}, Date: ${date}, Minutes: ${totalMinutes}, InOffice: ${isInOffice}`);
             res.json({ message: 'Сессия сохранена успешно' });
         });
-    });
+    }
 });
 
 // Обновить статус сотрудника (вызывается мобильным приложением)
