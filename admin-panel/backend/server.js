@@ -264,7 +264,6 @@ function manageOfficeSession(employeeId, isInOffice, totalMinutes) {
             if (isInOffice && totalMinutes > 0) {
                 // Сотрудник в офисе - создаем новую сессию
                 const now = new Date();
-                const startTime = new Date(now.getTime() - totalMinutes * 60 * 1000);
                 
                 const createSessionQuery = `
                     INSERT INTO office_sessions (employee_id, start_time, end_time, is_active)
@@ -273,14 +272,14 @@ function manageOfficeSession(employeeId, isInOffice, totalMinutes) {
                 
                 db.run(createSessionQuery, [
                     employeeId, 
-                    startTime.toISOString(), 
+                    now.toISOString(), // start_time = текущее время
                     null, // end_time = null для активной сессии
                     1 // is_active = 1
                 ], function(err) {
                     if (err) {
                         console.error('Ошибка создания сессии:', err);
                     } else {
-                        console.log(`Новая сессия создана: Employee ${employeeId}, Start: ${startTime.toISOString()}`);
+                        console.log(`Новая сессия создана: Employee ${employeeId}, Start: ${now.toISOString()}`);
                     }
                 });
             }
@@ -826,7 +825,7 @@ app.get('/api/employee/:id/sessions', (req, res) => {
                 WHEN end_time IS NOT NULL THEN 
                     ROUND((julianday(end_time) - julianday(start_time)) * 24 * 60)
                 WHEN is_active = 1 THEN 
-                    ROUND((julianday('now') - julianday(start_time)) * 24 * 60)
+                    ROUND((julianday(datetime('now')) - julianday(datetime(start_time))) * 24 * 60)
                 ELSE 0
             END as total_minutes
         FROM office_sessions 
