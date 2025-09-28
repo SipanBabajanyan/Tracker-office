@@ -46,8 +46,12 @@ export default function EmployeeDetail() {
   const [currentPeriod, setCurrentPeriod] = useState('today');
   const [editingName, setEditingName] = useState(false);
   const [editingTargetHours, setEditingTargetHours] = useState(false);
+  const [editingWorkSchedule, setEditingWorkSchedule] = useState(false);
   const [newName, setNewName] = useState('');
   const [newTargetHours, setNewTargetHours] = useState(8);
+  const [workSchedule, setWorkSchedule] = useState({ workStart: '10:00', workEnd: '19:00' });
+  const [newWorkStart, setNewWorkStart] = useState('10:00');
+  const [newWorkEnd, setNewWorkEnd] = useState('19:00');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(30);
   const { isAuthenticated, loading: authLoading } = useAuth();
@@ -82,6 +86,17 @@ export default function EmployeeDetail() {
       if (currentEmployee) {
         setEmployee(currentEmployee);
         setNewName(currentEmployee.name);
+        
+        // Загружаем рабочее расписание
+        try {
+          const scheduleResponse = await fetch(`http://192.168.15.20:3000/api/employee/${employeeId}/work-schedule`);
+          const schedule = await scheduleResponse.json();
+          setWorkSchedule(schedule);
+          setNewWorkStart(schedule.workStart);
+          setNewWorkEnd(schedule.workEnd);
+        } catch (error) {
+          console.error('Ошибка загрузки рабочего расписания:', error);
+        }
       }
 
       // Загружаем историю и коэффициенты параллельно
@@ -147,6 +162,31 @@ export default function EmployeeDetail() {
       }
     } catch (error) {
       console.error('Ошибка обновления целевых часов:', error);
+    }
+  };
+
+  const handleUpdateWorkSchedule = async () => {
+    if (!employee || !newWorkStart || !newWorkEnd) return;
+
+    try {
+      const response = await fetch(`http://192.168.15.20:3000/api/employee/${employee.id}/work-schedule`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          workStart: newWorkStart, 
+          workEnd: newWorkEnd 
+        }),
+      });
+
+      if (response.ok) {
+        setEditingWorkSchedule(false);
+        setWorkSchedule({ workStart: newWorkStart, workEnd: newWorkEnd });
+        loadEmployeeData(); // Перезагружаем данные
+      }
+    } catch (error) {
+      console.error('Ошибка обновления рабочего расписания:', error);
     }
   };
 
@@ -473,6 +513,69 @@ export default function EmployeeDetail() {
                   <span className="text-2xl font-bold text-gray-900">{coefficients?.targetHours || 8} часов</span>
                   <button
                     onClick={() => setEditingTargetHours(true)}
+                    className="text-blue-500 hover:text-blue-600 transition-colors"
+                  >
+                    ✏️
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Work Schedule Settings */}
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-6 mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">⏰ Рабочее расписание</h3>
+              <p className="text-gray-600">Установите время начала и окончания рабочего дня для контроля опозданий</p>
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              {editingWorkSchedule ? (
+                <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2">
+                    <label className="text-sm text-gray-600">Начало:</label>
+                    <input
+                      type="time"
+                      value={newWorkStart}
+                      onChange={(e) => setNewWorkStart(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <label className="text-sm text-gray-600">Конец:</label>
+                    <input
+                      type="time"
+                      value={newWorkEnd}
+                      onChange={(e) => setNewWorkEnd(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <button
+                    onClick={handleUpdateWorkSchedule}
+                    className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors"
+                  >
+                    ✓
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingWorkSchedule(false);
+                      setNewWorkStart(workSchedule.workStart);
+                      setNewWorkEnd(workSchedule.workEnd);
+                    }}
+                    className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-3">
+                  <span className="text-lg font-bold text-gray-900">
+                    {workSchedule.workStart} - {workSchedule.workEnd}
+                  </span>
+                  <button
+                    onClick={() => setEditingWorkSchedule(true)}
                     className="text-blue-500 hover:text-blue-600 transition-colors"
                   >
                     ✏️
