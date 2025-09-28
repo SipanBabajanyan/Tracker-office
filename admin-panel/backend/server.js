@@ -31,8 +31,22 @@ db.serialize(() => {
         name TEXT NOT NULL,
         device_id TEXT UNIQUE NOT NULL,
         target_hours_per_day INTEGER DEFAULT 8,
+        is_in_office BOOLEAN DEFAULT 0,
+        last_seen DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
+    
+    // Добавляем поля если их нет (игнорируем ошибки если колонки уже существуют)
+    db.run(`ALTER TABLE employees ADD COLUMN is_in_office BOOLEAN DEFAULT 0`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+            console.error('Ошибка добавления колонки is_in_office:', err);
+        }
+    });
+    db.run(`ALTER TABLE employees ADD COLUMN last_seen DATETIME`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+            console.error('Ошибка добавления колонки last_seen:', err);
+        }
+    });
 
     // Таблица сессий
     db.run(`CREATE TABLE IF NOT EXISTS office_sessions (
@@ -52,9 +66,17 @@ db.serialize(() => {
         date DATE NOT NULL,
         total_minutes INTEGER DEFAULT 0,
         sessions_count INTEGER DEFAULT 0,
+        is_in_office BOOLEAN DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (employee_id) REFERENCES employees (id)
     )`);
+    
+    // Добавляем поле is_in_office если его нет (игнорируем ошибки если колонка уже существует)
+    db.run(`ALTER TABLE daily_stats ADD COLUMN is_in_office BOOLEAN DEFAULT 0`, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+            console.error('Ошибка добавления колонки is_in_office в daily_stats:', err);
+        }
+    });
 });
 
 // API Routes
@@ -74,10 +96,10 @@ app.get('/api/employees', (req, res) => {
             id: row.id,
             name: row.name || '',
             deviceId: row.device_id || 'Неизвестно',
-            isInOffice: false, // Пока не интегрированы с мобильным приложением
+            isInOffice: Boolean(row.is_in_office),
             startTime: null,
             totalTimeToday: '0ч 0м',
-            lastSeen: 'Никогда'
+            lastSeen: row.last_seen ? new Date(row.last_seen).toLocaleString('ru-RU') : 'Никогда'
         }));
 
         res.json(employees);
@@ -172,6 +194,46 @@ app.put('/api/employees/:id', (req, res) => {
         }
 
         res.json({ message: 'Имя сотрудника обновлено' });
+    });
+});
+
+// Отправить сессию сотрудника (вызывается мобильным приложением)
+app.post('/api/employee/:id/session', (req, res) => {
+    const employeeId = req.params.id;
+    const { date, totalMinutes, isInOffice } = req.body;
+
+    if (!date || typeof totalMinutes !== 'number' || typeof isInOffice !== 'boolean') {
+        return res.status(400).json({ error: 'Неверные данные' });
+    }
+
+    // Обновляем или создаем запись в daily_stats
+    const query = `
+        INSERT OR REPLACE INTO daily_stats (employee_id, date, total_minutes, is_in_office)
+        VALUES (?, ?, ?, ?)
+    `;
+    
+    db.run(query, [employeeId, date, totalMinutes, isInOffice ? 1 : 0], function(err) {
+        if (err) {
+            console.error('Ошибка сохранения сессии:', err);
+            return res.status(500).json({ error: 'Ошибка базы данных' });
+        }
+
+        // Обновляем статус сотрудника
+        const updateEmployeeQuery = `
+            UPDATE employees 
+            SET is_in_office = ?, last_seen = datetime('now')
+            WHERE id = ?
+        `;
+        
+        db.run(updateEmployeeQuery, [isInOffice ? 1 : 0, employeeId], function(err) {
+            if (err) {
+                console.error('Ошибка обновления статуса сотрудника:', err);
+                return res.status(500).json({ error: 'Ошибка базы данных' });
+            }
+
+            console.log(`Сессия сохранена: Employee ${employeeId}, Date: ${date}, Minutes: ${totalMinutes}, InOffice: ${isInOffice}`);
+            res.json({ message: 'Сессия сохранена успешно' });
+        });
     });
 });
 
