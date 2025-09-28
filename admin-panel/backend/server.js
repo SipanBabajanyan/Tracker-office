@@ -72,6 +72,28 @@ db.serialize(() => {
         UNIQUE(employee_id, date)
     )`);
     
+    // Таблица рабочих дней
+    db.run(`CREATE TABLE IF NOT EXISTS work_days (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        employee_id INTEGER,
+        date DATE NOT NULL,
+        work_start_time DATETIME,
+        work_end_time DATETIME,
+        actual_start_time DATETIME,
+        actual_end_time DATETIME,
+        total_minutes INTEGER DEFAULT 0,
+        is_present BOOLEAN DEFAULT 0,
+        is_late BOOLEAN DEFAULT 0,
+        is_early_leave BOOLEAN DEFAULT 0,
+        late_minutes INTEGER DEFAULT 0,
+        early_leave_minutes INTEGER DEFAULT 0,
+        notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (employee_id) REFERENCES employees (id),
+        UNIQUE(employee_id, date)
+    )`);
+    
     // Добавляем поле is_in_office если его нет (игнорируем ошибки если колонка уже существует)
     db.run(`ALTER TABLE daily_stats ADD COLUMN is_in_office BOOLEAN DEFAULT 0`, (err) => {
         if (err && !err.message.includes('duplicate column name')) {
@@ -201,7 +223,7 @@ app.put('/api/employees/:id', (req, res) => {
 });
 
 // Отправить сессию сотрудника (вызывается мобильным приложением)
-app.post('/api/employee/:id/session', (req, res) => {
+app.post('/api/employee/:id/session', async (req, res) => {
     const employeeId = req.params.id;
     const { date, totalMinutes, isInOffice } = req.body;
 
@@ -209,58 +231,72 @@ app.post('/api/employee/:id/session', (req, res) => {
         return res.status(400).json({ error: 'Неверные данные' });
     }
 
-    // Сначала пытаемся обновить существующую запись
-    const updateQuery = `
-        UPDATE daily_stats 
-        SET total_minutes = ?, is_in_office = ?
-        WHERE employee_id = ? AND date = ?
-    `;
-    
-    db.run(updateQuery, [totalMinutes, isInOffice ? 1 : 0, employeeId, date], function(err) {
-        if (err) {
-            console.error('Ошибка обновления сессии:', err);
-            return res.status(500).json({ error: 'Ошибка базы данных' });
-        }
-        
-        if (this.changes > 0) {
-            // Запись обновлена
-            console.log(`Сессия обновлена: Employee ${employeeId}, Date: ${date}, Minutes: ${totalMinutes}, InOffice: ${isInOffice}`);
-            updateEmployeeStatus();
-        } else {
-            // Записи нет, создаем новую
-            const insertQuery = `
-                INSERT INTO daily_stats (employee_id, date, total_minutes, is_in_office)
-                VALUES (?, ?, ?, ?)
-            `;
+    try {
+        // Проверяем, является ли день рабочим
+        if (isWorkingDay(date)) {
+            // Создаем запись рабочего дня, если её нет
+            await createWorkDay(employeeId, date);
             
-            db.run(insertQuery, [employeeId, date, totalMinutes, isInOffice ? 1 : 0], function(err) {
-                if (err) {
-                    console.error('Ошибка создания сессии:', err);
-                    return res.status(500).json({ error: 'Ошибка базы данных' });
-                }
-                
-                console.log(`Сессия создана: Employee ${employeeId}, Date: ${date}, Minutes: ${totalMinutes}, InOffice: ${isInOffice}`);
-                updateEmployeeStatus();
-            });
+            // Обновляем фактическое время прихода/ухода
+            await updateWorkDayActualTime(employeeId, date, totalMinutes);
         }
-    });
 
-    function updateEmployeeStatus() {
-        // Обновляем статус сотрудника
-        const updateEmployeeQuery = `
-            UPDATE employees 
-            SET is_in_office = ?, last_seen = datetime('now')
-            WHERE id = ?
+        // Обновляем daily_stats (существующая логика)
+        const updateQuery = `
+            UPDATE daily_stats 
+            SET total_minutes = ?, is_in_office = ?
+            WHERE employee_id = ? AND date = ?
         `;
         
-        db.run(updateEmployeeQuery, [isInOffice ? 1 : 0, employeeId], function(err) {
+        db.run(updateQuery, [totalMinutes, isInOffice ? 1 : 0, employeeId, date], function(err) {
             if (err) {
-                console.error('Ошибка обновления статуса сотрудника:', err);
+                console.error('Ошибка обновления сессии:', err);
                 return res.status(500).json({ error: 'Ошибка базы данных' });
             }
-
-            res.json({ message: 'Сессия сохранена успешно' });
+            
+            if (this.changes > 0) {
+                // Запись обновлена
+                console.log(`Сессия обновлена: Employee ${employeeId}, Date: ${date}, Minutes: ${totalMinutes}, InOffice: ${isInOffice}`);
+                updateEmployeeStatus();
+            } else {
+                // Записи нет, создаем новую
+                const insertQuery = `
+                    INSERT INTO daily_stats (employee_id, date, total_minutes, is_in_office)
+                    VALUES (?, ?, ?, ?)
+                `;
+                
+                db.run(insertQuery, [employeeId, date, totalMinutes, isInOffice ? 1 : 0], function(err) {
+                    if (err) {
+                        console.error('Ошибка создания сессии:', err);
+                        return res.status(500).json({ error: 'Ошибка базы данных' });
+                    }
+                    
+                    console.log(`Сессия создана: Employee ${employeeId}, Date: ${date}, Minutes: ${totalMinutes}, InOffice: ${isInOffice}`);
+                    updateEmployeeStatus();
+                });
+            }
         });
+
+        function updateEmployeeStatus() {
+            // Обновляем статус сотрудника
+            const updateEmployeeQuery = `
+                UPDATE employees 
+                SET is_in_office = ?, last_seen = datetime('now')
+                WHERE id = ?
+            `;
+            
+            db.run(updateEmployeeQuery, [isInOffice ? 1 : 0, employeeId], function(err) {
+                if (err) {
+                    console.error('Ошибка обновления статуса сотрудника:', err);
+                    return res.status(500).json({ error: 'Ошибка базы данных' });
+                }
+
+                res.json({ message: 'Сессия сохранена успешно' });
+            });
+        }
+    } catch (error) {
+        console.error('Ошибка обработки сессии:', error);
+        res.status(500).json({ error: 'Ошибка обработки сессии' });
     }
 });
 
@@ -407,6 +443,145 @@ function isWorkingDay(dateStr) {
     const date = new Date(dateStr);
     const dayOfWeek = date.getDay(); // 0 = воскресенье, 1 = понедельник, ..., 6 = суббота
     return dayOfWeek >= 1 && dayOfWeek <= 5; // Понедельник-пятница
+}
+
+// Функция для создания записи рабочего дня
+function createWorkDay(employeeId, dateStr, workStartTime = '09:00', workEndTime = '18:00') {
+    return new Promise((resolve, reject) => {
+        const workStartDateTime = `${dateStr} ${workStartTime}:00`;
+        const workEndDateTime = `${dateStr} ${workEndTime}:00`;
+        
+        const query = `
+            INSERT OR IGNORE INTO work_days 
+            (employee_id, date, work_start_time, work_end_time, created_at, updated_at)
+            VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+        `;
+        
+        db.run(query, [employeeId, dateStr, workStartDateTime, workEndDateTime], function(err) {
+            if (err) {
+                console.error('Ошибка создания рабочего дня:', err);
+                reject(err);
+            } else {
+                console.log(`Рабочий день создан: Employee ${employeeId}, Date: ${dateStr}`);
+                resolve(this.lastID);
+            }
+        });
+    });
+}
+
+// Функция для обновления фактического времени прихода/ухода
+function updateWorkDayActualTime(employeeId, dateStr, totalMinutes = 0) {
+    return new Promise((resolve, reject) => {
+        // Получаем все сессии за день для определения первого входа и последнего выхода
+        const sessionsQuery = `
+            SELECT start_time, end_time, is_active
+            FROM office_sessions 
+            WHERE employee_id = ? AND DATE(start_time) = ?
+            ORDER BY start_time ASC
+        `;
+        
+        db.all(sessionsQuery, [employeeId, dateStr], (err, sessions) => {
+            if (err) {
+                console.error('Ошибка получения сессий:', err);
+                reject(err);
+                return;
+            }
+            
+            // Определяем первый вход и последний выход
+            let actualStartTime = null;
+            let actualEndTime = null;
+            
+            if (sessions.length > 0) {
+                // Первый вход - время первой сессии
+                actualStartTime = sessions[0].start_time;
+                
+                // Последний выход - время последней завершенной сессии или текущее время если сессия активна
+                const lastSession = sessions[sessions.length - 1];
+                if (lastSession.end_time) {
+                    actualEndTime = lastSession.end_time;
+                } else if (lastSession.is_active) {
+                    actualEndTime = new Date().toISOString();
+                }
+            }
+            
+            // Получаем данные рабочего дня
+            const getQuery = 'SELECT * FROM work_days WHERE employee_id = ? AND date = ?';
+            db.get(getQuery, [employeeId, dateStr], (err, workDay) => {
+                if (err) {
+                    console.error('Ошибка получения рабочего дня:', err);
+                    reject(err);
+                    return;
+                }
+                
+                if (!workDay) {
+                    console.log(`Рабочий день не найден для Employee ${employeeId}, Date: ${dateStr}`);
+                    resolve(null);
+                    return;
+                }
+                
+                // Рассчитываем опоздания и ранние уходы
+                let isLate = false;
+                let isEarlyLeave = false;
+                let lateMinutes = 0;
+                let earlyLeaveMinutes = 0;
+                let isPresent = totalMinutes > 0;
+                
+                if (actualStartTime && workDay.work_start_time) {
+                    const workStart = new Date(workDay.work_start_time);
+                    const actualStart = new Date(actualStartTime);
+                    if (actualStart > workStart) {
+                        isLate = true;
+                        lateMinutes = Math.round((actualStart - workStart) / 1000 / 60);
+                    }
+                }
+                
+                if (actualEndTime && workDay.work_end_time) {
+                    const workEnd = new Date(workDay.work_end_time);
+                    const actualEnd = new Date(actualEndTime);
+                    if (actualEnd < workEnd) {
+                        isEarlyLeave = true;
+                        earlyLeaveMinutes = Math.round((workEnd - actualEnd) / 1000 / 60);
+                    }
+                }
+                
+                // Обновляем запись
+                const updateQuery = `
+                    UPDATE work_days SET 
+                        actual_start_time = ?,
+                        actual_end_time = ?,
+                        total_minutes = ?,
+                        is_present = ?,
+                        is_late = ?,
+                        is_early_leave = ?,
+                        late_minutes = ?,
+                        early_leave_minutes = ?,
+                        updated_at = datetime('now')
+                    WHERE employee_id = ? AND date = ?
+                `;
+                
+                db.run(updateQuery, [
+                    actualStartTime,
+                    actualEndTime,
+                    totalMinutes,
+                    isPresent ? 1 : 0,
+                    isLate ? 1 : 0,
+                    isEarlyLeave ? 1 : 0,
+                    lateMinutes,
+                    earlyLeaveMinutes,
+                    employeeId,
+                    dateStr
+                ], function(err) {
+                    if (err) {
+                        console.error('Ошибка обновления рабочего дня:', err);
+                        reject(err);
+                    } else {
+                        console.log(`Рабочий день обновлен: Employee ${employeeId}, Date: ${dateStr}`);
+                        resolve(this.changes);
+                    }
+                });
+            });
+        });
+    });
 }
 
 // Функция расчета коэффициента с учетом рабочих дней
@@ -707,6 +882,148 @@ app.put('/api/employee/:id/target-hours', (req, res) => {
         res.json({ message: 'Целевые часы обновлены', targetHours });
     });
 });
+
+// Получить рабочие дни сотрудника
+app.get('/api/employee/:id/work-days', (req, res) => {
+    const employeeId = req.params.id;
+    const { startDate, endDate } = req.query;
+    
+    let query = `
+        SELECT 
+            wd.*,
+            e.name as employee_name
+        FROM work_days wd
+        JOIN employees e ON wd.employee_id = e.id
+        WHERE wd.employee_id = ?
+    `;
+    
+    const params = [employeeId];
+    
+    if (startDate) {
+        query += ' AND wd.date >= ?';
+        params.push(startDate);
+    }
+    if (endDate) {
+        query += ' AND wd.date <= ?';
+        params.push(endDate);
+    }
+    
+    query += ' ORDER BY wd.date DESC';
+    
+    db.all(query, params, (err, rows) => {
+        if (err) {
+            console.error('Ошибка получения рабочих дней:', err);
+            return res.status(500).json({ error: 'Ошибка базы данных' });
+        }
+        
+        const workDays = rows.map(row => ({
+            id: row.id,
+            date: row.date,
+            workStartTime: row.work_start_time,
+            workEndTime: row.work_end_time,
+            actualStartTime: row.actual_start_time,
+            actualEndTime: row.actual_end_time,
+            totalMinutes: row.total_minutes,
+            isPresent: Boolean(row.is_present),
+            isLate: Boolean(row.is_late),
+            isEarlyLeave: Boolean(row.is_early_leave),
+            lateMinutes: row.late_minutes,
+            earlyLeaveMinutes: row.early_leave_minutes,
+            notes: row.notes,
+            status: getWorkDayStatus(row),
+            employeeName: row.employee_name
+        }));
+        
+        res.json(workDays);
+    });
+});
+
+// Получить рабочий день по дате
+app.get('/api/employee/:id/work-day/:date', (req, res) => {
+    const employeeId = req.params.id;
+    const date = req.params.date;
+    
+    const query = `
+        SELECT 
+            wd.*,
+            e.name as employee_name
+        FROM work_days wd
+        JOIN employees e ON wd.employee_id = e.id
+        WHERE wd.employee_id = ? AND wd.date = ?
+    `;
+    
+    db.get(query, [employeeId, date], (err, row) => {
+        if (err) {
+            console.error('Ошибка получения рабочего дня:', err);
+            return res.status(500).json({ error: 'Ошибка базы данных' });
+        }
+        
+        if (!row) {
+            return res.status(404).json({ error: 'Рабочий день не найден' });
+        }
+        
+        const workDay = {
+            id: row.id,
+            date: row.date,
+            workStartTime: row.work_start_time,
+            workEndTime: row.work_end_time,
+            actualStartTime: row.actual_start_time,
+            actualEndTime: row.actual_end_time,
+            totalMinutes: row.total_minutes,
+            isPresent: Boolean(row.is_present),
+            isLate: Boolean(row.is_late),
+            isEarlyLeave: Boolean(row.is_early_leave),
+            lateMinutes: row.late_minutes,
+            earlyLeaveMinutes: row.early_leave_minutes,
+            notes: row.notes,
+            status: getWorkDayStatus(row),
+            employeeName: row.employee_name
+        };
+        
+        res.json(workDay);
+    });
+});
+
+// Обновить рабочее время для дня
+app.put('/api/employee/:id/work-day/:date', (req, res) => {
+    const employeeId = req.params.id;
+    const date = req.params.date;
+    const { workStartTime, workEndTime, notes } = req.body;
+    
+    const workStartDateTime = workStartTime ? `${date} ${workStartTime}:00` : null;
+    const workEndDateTime = workEndTime ? `${date} ${workEndTime}:00` : null;
+    
+    const query = `
+        UPDATE work_days SET 
+            work_start_time = ?,
+            work_end_time = ?,
+            notes = ?,
+            updated_at = datetime('now')
+        WHERE employee_id = ? AND date = ?
+    `;
+    
+    db.run(query, [workStartDateTime, workEndDateTime, notes, employeeId, date], function(err) {
+        if (err) {
+            console.error('Ошибка обновления рабочего дня:', err);
+            return res.status(500).json({ error: 'Ошибка базы данных' });
+        }
+        
+        if (this.changes === 0) {
+            return res.status(404).json({ error: 'Рабочий день не найден' });
+        }
+        
+        res.json({ message: 'Рабочий день обновлен' });
+    });
+});
+
+// Функция для определения статуса рабочего дня
+function getWorkDayStatus(workDay) {
+    if (!workDay.is_present) return 'Отсутствовал';
+    if (workDay.is_late && workDay.is_early_leave) return 'Опоздал и ушел раньше';
+    if (workDay.is_late) return 'Опоздал';
+    if (workDay.is_early_leave) return 'Ушел раньше';
+    return 'Время соблюдено';
+}
 
 // Запуск сервера
 app.listen(PORT, () => {
