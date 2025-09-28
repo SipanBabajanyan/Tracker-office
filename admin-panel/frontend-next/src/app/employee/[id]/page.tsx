@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Clock, Calendar, TrendingUp, User, Activity } from 'lucide-react';
+import { ArrowLeft, Clock, Calendar, TrendingUp, User, Activity, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface EmployeeHistory {
@@ -50,6 +50,8 @@ export default function EmployeeDetail() {
   const [newTargetHours, setNewTargetHours] = useState(8);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(30);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { isAuthenticated, loading: authLoading } = useAuth();
   const router = useRouter();
   const params = useParams();
@@ -147,6 +149,32 @@ export default function EmployeeDetail() {
       }
     } catch (error) {
       console.error('Ошибка обновления целевых часов:', error);
+    }
+  };
+
+  const handleDeleteEmployee = async () => {
+    if (!employee) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`http://192.168.15.20:3000/api/employees/${employee.id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        console.log('Сотрудник удален успешно');
+        router.push('/');
+      } else {
+        const errorData = await response.json();
+        console.error('Ошибка удаления сотрудника:', errorData.error);
+        alert(`Ошибка удаления: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error('Ошибка удаления сотрудника:', error);
+      alert('Произошла ошибка при удалении сотрудника');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteModal(false);
     }
   };
 
@@ -328,7 +356,7 @@ export default function EmployeeDetail() {
                 </div>
             </div>
             
-            {/* Right Section - Status */}
+            {/* Right Section - Status and Actions */}
             <div className="flex items-center space-x-3">
               <div className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium ${
                 employee.isInOffice
@@ -340,6 +368,15 @@ export default function EmployeeDetail() {
                 }`}></div>
                 <span>{employee.isInOffice ? 'В офисе' : 'Вне офиса'}</span>
               </div>
+              
+              {/* Delete Button */}
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                className="group p-2 rounded-xl hover:bg-red-50 transition-all duration-200"
+                title="Удалить сотрудника"
+              >
+                <Trash2 className="h-5 w-5 text-gray-400 group-hover:text-red-600 transition-colors" />
+              </button>
             </div>
           </div>
         </div>
@@ -611,6 +648,53 @@ export default function EmployeeDetail() {
                   )}
                 </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
+            <div className="text-center">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                <Trash2 className="h-6 w-6 text-red-600" />
+              </div>
+              
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Удалить сотрудника
+              </h3>
+              
+              <p className="text-sm text-gray-600 mb-6">
+                Вы уверены, что хотите удалить сотрудника <strong>{employee?.name}</strong>? 
+                Это действие нельзя отменить. Будут удалены все данные сотрудника, включая сессии и статистику.
+              </p>
+              
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={isDeleting}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+                >
+                  Отмена
+                </button>
+                
+                <button
+                  onClick={handleDeleteEmployee}
+                  disabled={isDeleting}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+                >
+                  {isDeleting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Удаление...
+                    </>
+                  ) : (
+                    'Удалить'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

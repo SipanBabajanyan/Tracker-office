@@ -200,6 +200,53 @@ app.put('/api/employees/:id', (req, res) => {
     });
 });
 
+// Удалить сотрудника
+app.delete('/api/employees/:id', (req, res) => {
+    const { id } = req.params;
+
+    if (!id || isNaN(Number(id))) {
+        return res.status(400).json({ error: 'Неверный ID сотрудника' });
+    }
+
+    // Сначала удаляем связанные записи из других таблиц
+    const deleteSessionsQuery = 'DELETE FROM office_sessions WHERE employee_id = ?';
+    const deleteStatsQuery = 'DELETE FROM daily_stats WHERE employee_id = ?';
+    const deleteEmployeeQuery = 'DELETE FROM employees WHERE id = ?';
+
+    db.serialize(() => {
+        // Удаляем сессии
+        db.run(deleteSessionsQuery, [id], function(err) {
+            if (err) {
+                console.error('Ошибка удаления сессий:', err);
+                return res.status(500).json({ error: 'Ошибка удаления сессий' });
+            }
+        });
+
+        // Удаляем статистику
+        db.run(deleteStatsQuery, [id], function(err) {
+            if (err) {
+                console.error('Ошибка удаления статистики:', err);
+                return res.status(500).json({ error: 'Ошибка удаления статистики' });
+            }
+        });
+
+        // Удаляем сотрудника
+        db.run(deleteEmployeeQuery, [id], function(err) {
+            if (err) {
+                console.error('Ошибка удаления сотрудника:', err);
+                return res.status(500).json({ error: 'Ошибка удаления сотрудника' });
+            }
+
+            if (this.changes === 0) {
+                return res.status(404).json({ error: 'Сотрудник не найден' });
+            }
+
+            console.log(`Сотрудник с ID ${id} и все связанные данные удалены`);
+            res.json({ message: 'Сотрудник и все связанные данные удалены успешно' });
+        });
+    });
+});
+
 // Отправить сессию сотрудника (вызывается мобильным приложением)
 app.post('/api/employee/:id/session', (req, res) => {
     const employeeId = req.params.id;
