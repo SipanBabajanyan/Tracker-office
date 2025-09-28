@@ -672,9 +672,10 @@ function calculateCoefficient(totalMinutes, targetHoursPerDay, dateStr) {
         SELECT 
             ds.date,
             ds.total_minutes,
+            ds.is_in_office,
             e.target_hours_per_day,
             CASE 
-                WHEN ds.total_minutes > 0 THEN 'В офисе'
+                WHEN ds.is_in_office = 1 THEN 'В офисе'
                 ELSE 'Вне офиса'
             END as status
         FROM daily_stats ds
