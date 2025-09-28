@@ -999,7 +999,9 @@ app.get('/api/employee/:id/day/:date', (req, res) => {
             const processedSessions = sessions.map(session => {
                 const startTime = new Date(session.start_time);
                 const endTime = session.end_time ? new Date(session.end_time) : null;
-                const duration = endTime ? Math.round((endTime - startTime) / 1000 / 60) : 0; // в минутах
+                const duration = endTime ? 
+                    Math.round((endTime - startTime) / 1000 / 60) : 
+                    Math.round((new Date() - startTime) / 1000 / 60); // в минутах
                 
                 return {
                     id: session.id,
@@ -1007,11 +1009,13 @@ app.get('/api/employee/:id/day/:date', (req, res) => {
                     endTime: session.end_time,
                     startTimeFormatted: startTime.toLocaleTimeString('ru-RU', { 
                         hour: '2-digit', 
-                        minute: '2-digit' 
+                        minute: '2-digit',
+                        timeZone: 'Europe/Moscow'
                     }),
                     endTimeFormatted: endTime ? endTime.toLocaleTimeString('ru-RU', { 
                         hour: '2-digit', 
-                        minute: '2-digit' 
+                        minute: '2-digit',
+                        timeZone: 'Europe/Moscow'
                     }) : 'Активна',
                     duration: duration,
                     durationFormatted: formatTime(duration),
