@@ -51,7 +51,7 @@ yarn-debug.log*
 yarn-error.log*
 package-lock.json
 
-# Database files
-*.db
-*.sqlite
-*.sqlite3
+# Database files (commented out - needed for development)
+# *.db
+# *.sqlite
+# *.sqlite3
