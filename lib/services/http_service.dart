@@ -86,7 +86,38 @@ class HttpService {
     }
   }
   
-  /// Отправить сессию сотрудника
+  /// Отправить статус сотрудника (НОВЫЙ API - только статус)
+  static Future<bool> sendStatus({
+    required int employeeId,
+    required bool isInOffice,
+    required String timestamp,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/employee/$employeeId/status'),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'isInOffice': isInOffice,
+          'timestamp': timestamp,
+        }),
+      );
+      
+      if (response.statusCode == 200) {
+        print('HTTP: Статус отправлен успешно: Employee=$employeeId, InOffice=$isInOffice, Time=$timestamp');
+        return true;
+      } else {
+        print('HTTP: Ошибка отправки статуса: ${response.statusCode} - ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      print('HTTP: Ошибка при отправке статуса: $e');
+      return false;
+    }
+  }
+
+  /// Отправить сессию сотрудника (СТАРЫЙ API - для совместимости)
   static Future<bool> sendSession({
     required int employeeId,
     required String date,

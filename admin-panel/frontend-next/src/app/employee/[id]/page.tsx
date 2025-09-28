@@ -91,11 +91,18 @@ export default function EmployeeDetail() {
         try {
           const scheduleResponse = await fetch(`http://localhost:3000/api/employee/${employeeId}/work-schedule`);
           const schedule = await scheduleResponse.json();
-          setWorkSchedule(schedule);
-          setNewWorkStart(schedule.workStart);
-          setNewWorkEnd(schedule.workEnd);
+          setWorkSchedule({
+            workStart: schedule.defaultWorkStart || '10:00',
+            workEnd: schedule.defaultWorkEnd || '19:00'
+          });
+          setNewWorkStart(schedule.defaultWorkStart || '10:00');
+          setNewWorkEnd(schedule.defaultWorkEnd || '19:00');
         } catch (error) {
           console.error('Ошибка загрузки рабочего расписания:', error);
+          // Устанавливаем значения по умолчанию при ошибке
+          setWorkSchedule({ workStart: '10:00', workEnd: '19:00' });
+          setNewWorkStart('10:00');
+          setNewWorkEnd('19:00');
         }
       }
 
@@ -159,8 +166,8 @@ export default function EmployeeDetail() {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-            workStart: newWorkStart, 
-            workEnd: newWorkEnd 
+            defaultWorkStart: newWorkStart, 
+            defaultWorkEnd: newWorkEnd 
           }),
         })
       ]);
@@ -542,7 +549,7 @@ export default function EmployeeDetail() {
                     <label className="text-xs text-gray-600 w-12">Начало:</label>
                     <input
                       type="time"
-                      value={newWorkStart}
+                      value={newWorkStart || '10:00'}
                       onChange={(e) => setNewWorkStart(e.target.value)}
                       className="px-2 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
                     />
@@ -551,7 +558,7 @@ export default function EmployeeDetail() {
                     <label className="text-xs text-gray-600 w-12">Конец:</label>
                     <input
                       type="time"
-                      value={newWorkEnd}
+                      value={newWorkEnd || '19:00'}
                       onChange={(e) => setNewWorkEnd(e.target.value)}
                       className="px-2 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
                     />

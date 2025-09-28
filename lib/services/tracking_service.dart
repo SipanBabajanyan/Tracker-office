@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'database_service.dart';
 import 'wifi_service.dart';
+import 'http_service.dart';
 import '../models/office_session.dart';
 
 /// Сервис для отслеживания времени в офисе
@@ -73,7 +74,10 @@ class TrackingService {
       
       print('Текущий статус: $isInOffice, предыдущий: $lastCheck');
       
-      // Всегда обновляем статус при проверке
+      // Отправляем статус на сервер (НОВЫЙ API)
+      await _sendStatusToServer(isInOffice);
+      
+      // Локальная логика для отображения в приложении
       if (isInOffice) {
         await _startOfficeSession();
       } else {
@@ -86,6 +90,32 @@ class TrackingService {
       
     } catch (e) {
       print('Ошибка при проверке статуса офиса: $e');
+    }
+  }
+
+  /// Отправляет статус на сервер (НОВЫЙ API)
+  static Future<void> _sendStatusToServer(bool isInOffice) async {
+    try {
+      final employeeId = await HttpService.getEmployeeId();
+      if (employeeId == null) {
+        print('HTTP: ID сотрудника не найден, пропускаем отправку статуса');
+        return;
+      }
+
+      final timestamp = DateTime.now().toIso8601String();
+      final success = await HttpService.sendStatus(
+        employeeId: employeeId,
+        isInOffice: isInOffice,
+        timestamp: timestamp,
+      );
+
+      if (success) {
+        print('HTTP: Статус отправлен на сервер: InOffice=$isInOffice, Time=$timestamp');
+      } else {
+        print('HTTP: Ошибка отправки статуса на сервер');
+      }
+    } catch (e) {
+      print('HTTP: Ошибка при отправке статуса: $e');
     }
   }
 
