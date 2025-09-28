@@ -513,34 +513,30 @@ export default function EmployeeDetail() {
                       {/* Table Body */}
                       <div className="divide-y divide-gray-100">
                         {getPaginatedHistory().map((day, index) => (
-                          <div key={index} className="px-8 py-4 hover:bg-gray-50 transition-colors">
+                          <div 
+                            key={index} 
+                            className="px-8 py-4 hover:bg-blue-50 cursor-pointer transition-colors group"
+                            onClick={() => router.push(`/employee/${employeeId}/day/${day.date}`)}
+                            title="Нажмите для детальной истории дня"
+                          >
                             <div className="grid grid-cols-5 gap-0 items-center">
                               {/* Дата */}
-                              <div 
-                                className="cursor-pointer hover:bg-blue-50 p-2 rounded-lg transition-colors group"
-                                onClick={() => router.push(`/employee/${employeeId}/day/${day.date}`)}
-                                title="Нажмите для детальной истории дня"
-                              >
-                                <div className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                                  {formatDate(day.date)}
-                                </div>
-                                <div className="text-sm text-gray-500 group-hover:text-blue-500 transition-colors">
-                                  {day.date} • Нажмите для деталей
-                                </div>
+                              <div className="font-semibold text-gray-900 whitespace-nowrap">
+                                {formatDate(day.date)}
                               </div>
                               
                               {/* Время (справа) */}
-                              <div className="text-right">
-                                <div className="text-lg font-bold text-gray-900">
+                              <div className="text-right group-hover:text-blue-600 transition-colors">
+                                <div className="text-lg font-bold text-gray-900 group-hover:text-blue-700">
                                   {day.time}
                                 </div>
-                                <div className="text-sm text-gray-500">
+                                <div className="text-sm text-gray-500 group-hover:text-blue-500">
                                   из {day.targetTime}
                                 </div>
                               </div>
                               
                               {/* Коэффициент (справа) */}
-                              <div className={`text-lg font-bold text-right ${
+                              <div className={`text-lg font-bold text-right group-hover:opacity-80 transition-opacity ${
                                 day.coefficient >= 120 ? 'text-green-800' :
                                 day.coefficient >= 100 ? 'text-green-600' : 
                                 day.coefficient >= 90 ? 'text-orange-600' : 'text-red-600'
@@ -549,14 +545,14 @@ export default function EmployeeDetail() {
                               </div>
                               
                               {/* Разница (справа) */}
-                              <div className={`text-lg font-bold text-right ${
+                              <div className={`text-lg font-bold text-right group-hover:opacity-80 transition-opacity ${
                                 day.timeDiffMinutes >= 0 ? 'text-green-600' : 'text-red-600'
                               }`}>
                                 {formatTimeDiff(day.timeDiffMinutes)}
                               </div>
                               
                               {/* Статус (справа) */}
-                              <div className="text-right">
+                              <div className="text-right group-hover:opacity-80 transition-opacity">
                                 <span className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${
                                   day.status === 'В офисе'
                                     ? 'bg-green-100 text-green-800'
