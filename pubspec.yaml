@@ -52,6 +52,12 @@ dependencies:
   
   # Permissions
   permission_handler: ^11.2.0
+  
+  # HTTP client for API requests
+  http: ^1.1.0
+  
+  # Device information for unique ID
+  device_info_plus: ^10.1.0
 
 dev_dependencies:
   flutter_test:

@@ -111,6 +111,13 @@ class DatabaseService {
     return total;
   }
 
+  /// Получает общее количество минут за день (для API)
+  Future<int> getTotalMinutesForDate(String dateStr) async {
+    final date = DateTime.parse(dateStr);
+    final totalTime = await getTotalTimeForDay(date);
+    return totalTime.inMinutes;
+  }
+
   /// Закрывает базу данных
   Future<void> close() async {
     final db = await database;
